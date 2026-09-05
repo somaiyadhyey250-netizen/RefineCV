@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>ResumeAI — AI Resume Analyzer</title>
+
+    <link
+        rel="stylesheet"
+        href="/style.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<header class="navbar">
+
+    <a href="/" class="logo">
+
+        <span class="logo-icon">✦</span>
+
+        <span>ResumeAI</span>
+
+    </a>
+
+
+    <nav class="nav-links">
+
+        <a href="#features">
+            Features
+        </a>
+
+        <a href="#how-it-works">
+            How it works
+        </a>
+
+    </nav>
+
+</header>
+
+
+
+<main>
+
+
+<!-- =================================
+     HERO
+================================= -->
+
+<section class="hero">
+
+
+    <div class="hero-content">
+
+
+        <div class="badge">
+
+            <span>✦</span>
+
+            AI-Powered Resume Analysis
+
+        </div>
+
+
+        <h1>
+
+            Turn your resume into
+
+            <span>
+                a stronger career.
+            </span>
+
+        </h1>
+
+
+        <p class="hero-description">
+
+            Upload your resume and let AI analyze your
+            skills, experience, ATS compatibility and
+            improvement areas.
+
+        </p>
+
+
+    </div>
+
+
+
+    <!-- UPLOAD CARD -->
+
+    <div class="upload-card">
+
+
+        <div class="upload-icon">
+            ↑
+        </div>
+
+
+        <h2>
+            Upload your resume
+        </h2>
+
+
+        <p class="upload-description">
+
+            Drag & drop your PDF here or choose a file
+
+        </p>
+
+
+
+        <label
+            for="resumeFile"
+            class="drop-zone"
+        >
+
+            <div class="drop-icon">
+                ↑
+            </div>
+
+
+            <div class="drop-text">
+
+                <strong>
+                    Drop your resume here
+                </strong>
+
+                <span>
+                    or click to browse your files
+                </span>
+
+            </div>
+
+        </label>
+
+
+
+        <input
+            type="file"
+            id="resumeFile"
+            accept=".pdf"
+            hidden
+        >
+
+
+
+        <div class="file-info">
+
+            PDF files only · Max 5 MB
+
+        </div>
+
+
+
+        <div
+            id="selectedFile"
+            class="selected-file"
+        ></div>
+
+
+
+        <button
+            id="analyzeButton"
+            class="analyze-button"
+            type="button"
+        >
+
+            <span>
+                Analyze Resume
+            </span>
+
+            <span class="button-arrow">
+                →
+            </span>
+
+        </button>
+
+
+    </div>
+
+
+</section>
+
+
+
+<!-- =================================
+     FEATURES
+================================= -->
+
+<section
+    id="features"
+    class="features-section"
+>
+
+
+    <div class="section-heading">
+
+        <span class="section-label">
+            WHAT YOU GET
+        </span>
+
+
+        <h2>
+            More than just a resume checker.
+        </h2>
+
+
+        <p>
+            Get meaningful insights instead of a generic score.
+        </p>
+
+    </div>
+
+
+
+    <div class="features-grid">
+
+
+        <article class="feature-card">
+
+            <div class="feature-icon">
+                ◉
+            </div>
+
+            <h3>
+                ATS Analysis
+            </h3>
+
+            <p>
+
+                Understand how well your resume performs
+                against Applicant Tracking Systems.
+
+            </p>
+
+        </article>
+
+
+
+        <article class="feature-card">
+
+            <div class="feature-icon">
+                ◇
+            </div>
+
+            <h3>
+                Skill Analysis
+            </h3>
+
+            <p>
+
+                Identify your strongest skills and discover
+                important skills missing from your resume.
+
+            </p>
+
+        </article>
+
+
+
+        <article class="feature-card">
+
+            <div class="feature-icon">
+                ↗
+            </div>
+
+            <h3>
+                AI Suggestions
+            </h3>
+
+            <p>
+
+                Receive practical recommendations to make
+                your resume stronger and more relevant.
+
+            </p>
+
+        </article>
+
+
+    </div>
+
+
+</section>
+
+
+
+<!-- =================================
+     HOW IT WORKS
+================================= -->
+
+<section
+    id="how-it-works"
+    class="how-section"
+>
+
+
+    <div class="section-heading">
+
+        <span class="section-label">
+            HOW IT WORKS
+        </span>
+
+
+        <h2>
+            Three steps. One better resume.
+        </h2>
+
+
+        <p>
+            From your PDF to actionable career insights.
+        </p>
+
+    </div>
+
+
+
+    <div class="steps">
+
+
+        <article class="step">
+
+            <div class="step-number">
+                01
+            </div>
+
+            <h3>
+                Upload
+            </h3>
+
+            <p>
+
+                Upload your resume as a PDF and let
+                ResumeAI prepare it for analysis.
+
+            </p>
+
+        </article>
+
+
+
+        <article class="step">
+
+            <div class="step-number">
+                02
+            </div>
+
+            <h3>
+                Analyze
+            </h3>
+
+            <p>
+
+                Our Java backend extracts the resume
+                content and sends it for AI analysis.
+
+            </p>
+
+        </article>
+
+
+
+        <article class="step">
+
+            <div class="step-number">
+                03
+            </div>
+
+            <h3>
+                Improve
+            </h3>
+
+            <p>
+
+                Get your score, strengths, weaknesses
+                and actionable improvement suggestions.
+
+            </p>
+
+        </article>
+
+
+    </div>
+
+
+</section>
+
+
+</main>
+
+
+
+<!-- =================================
+     FOOTER
+================================= -->
+
+<footer class="footer">
+
+
+    <div class="footer-brand">
+
+        <span class="logo-icon">
+            ✦
+        </span>
+
+        <span>
+            ResumeAI
+        </span>
+
+    </div>
+
+
+    <p>
+        AI-powered resume analysis for smarter applications.
+    </p>
+
+
+    <div class="footer-divider"></div>
+
+
+    <p class="developer-credit">
+
+        Developed by
+        <strong>
+            Dhyey Somaiya
+        </strong>
+
+    </p>
+
+
+    <p class="copyright">
+
+        © 2026 ResumeAI. All rights reserved.
+
+    </p>
+
+
+</footer>
+
+
+
+<script src="/script.js"></script>
+
+
+</body>
+
+</html>

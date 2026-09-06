@@ -1,192 +1,364 @@
-const resumeInput =
-    document.getElementById("resumeFile");
-
-const analyzeButton =
-    document.getElementById("analyzeButton");
-
-const selectedFile =
-    document.getElementById("selectedFile");
-
-const dropZone =
-    document.querySelector(".drop-zone");
+/* =========================================================
+   REFINECV — V2 FRONTEND
+   ========================================================= */
 
 
-/* =========================================
-   FILE SELECTION
-========================================= */
+/* =========================================================
+   ELEMENTS
+   ========================================================= */
 
-resumeInput.addEventListener(
-    "change",
-    function () {
+const resumeInput = document.getElementById("resumeFile");
+const dropZone = document.getElementById("dropZone");
 
-        const file =
-            resumeInput.files[0];
+const selectedFile = document.getElementById("selectedFile");
+const analyzeButton = document.getElementById("analyzeButton");
 
-        if (!file) {
+const dropTitle = document.getElementById("dropTitle");
+const dropSubtitle = document.getElementById("dropSubtitle");
 
-            selectedFile.textContent = "";
+const analysisLoading = document.getElementById("analysisLoading");
+const resultsSection = document.getElementById("resultsSection");
 
-            return;
-        }
+const resultsContent = document.getElementById("resultsContent");
 
-        handleFile(file);
+const analyzeAgain = document.getElementById("analyzeAgain");
 
-    }
-);
+const messageBox = document.getElementById("messageBox");
 
 
-/* =========================================
+/* =========================================================
+   STATE
+   ========================================================= */
+
+let selectedResume = null;
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+
+/* =========================================================
    FILE VALIDATION
-========================================= */
+   ========================================================= */
 
-function handleFile(file) {
+function validateFile(file) {
 
-    if (
-        file.type !==
-        "application/pdf"
-    ) {
-
-        selectedFile.textContent =
-            "❌ Please select a PDF file.";
-
-        resumeInput.value = "";
-
-        return;
+    if (!file) {
+        return {
+            valid: false,
+            message: "Please select a resume."
+        };
     }
 
+    const isPdf =
+        file.type === "application/pdf" ||
+        file.name.toLowerCase().endsWith(".pdf");
 
-    const maxSize =
-        5 * 1024 * 1024;
-
-
-    if (file.size > maxSize) {
-
-        selectedFile.textContent =
-            "❌ File is too large. Maximum size is 5 MB.";
-
-        resumeInput.value = "";
-
-        return;
+    if (!isPdf) {
+        return {
+            valid: false,
+            message: "Please upload a PDF resume."
+        };
     }
 
+    if (file.size > MAX_FILE_SIZE) {
+        return {
+            valid: false,
+            message: "Resume must be smaller than 5 MB."
+        };
+    }
 
-    const fileSize =
-        (
-            file.size /
-            (1024 * 1024)
-        ).toFixed(2);
+    if (file.size === 0) {
+        return {
+            valid: false,
+            message: "The selected PDF appears to be empty."
+        };
+    }
 
-
-    selectedFile.textContent =
-        `✓ ${file.name} (${fileSize} MB)`;
-
+    return {
+        valid: true
+    };
 }
 
 
-/* =========================================
-   DRAG & DROP
-========================================= */
+/* =========================================================
+   SELECT FILE
+   ========================================================= */
 
-dropZone.addEventListener(
-    "dragover",
-    function (event) {
+function handleFile(file) {
+
+    const validation = validateFile(file);
+
+    if (!validation.valid) {
+
+        selectedResume = null;
+
+        resumeInput.value = "";
+
+        analyzeButton.disabled = true;
+
+        selectedFile.textContent = "";
+        selectedFile.classList.remove("visible");
+
+        dropTitle.textContent =
+            "Drop your resume here";
+
+        dropSubtitle.textContent =
+            "or click anywhere here to browse";
+
+        showMessage(validation.message);
+
+        return;
+    }
+
+
+    selectedResume = file;
+
+    analyzeButton.disabled = false;
+
+
+    selectedFile.textContent =
+        `✓  ${file.name}  ·  ${formatFileSize(file.size)}`;
+
+    selectedFile.classList.add("visible");
+
+
+    dropTitle.textContent =
+        "Resume selected";
+
+    dropSubtitle.textContent =
+        "Click here to choose a different PDF";
+
+
+    hideMessage();
+}
+
+
+/* =========================================================
+   FORMAT FILE SIZE
+   ========================================================= */
+
+function formatFileSize(bytes) {
+
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+
+    if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+
+/* =========================================================
+   OPEN FILE PICKER
+   ========================================================= */
+
+function openFilePicker() {
+
+    if (!resumeInput) {
+        return;
+    }
+
+    resumeInput.click();
+}
+
+
+/* =========================================================
+   DROP ZONE CLICK
+   ========================================================= */
+
+dropZone.addEventListener("click", function (event) {
+
+    if (event.target === resumeInput) {
+        return;
+    }
+
+    openFilePicker();
+});
+
+
+/* =========================================================
+   KEYBOARD ACCESS
+   ========================================================= */
+
+dropZone.addEventListener("keydown", function (event) {
+
+    if (
+        event.key === "Enter" ||
+        event.key === " "
+    ) {
 
         event.preventDefault();
 
-        dropZone.classList.add(
-            "dragging"
-        );
-
+        openFilePicker();
     }
-);
+
+});
 
 
-dropZone.addEventListener(
-    "dragleave",
-    function () {
+/* =========================================================
+   FILE INPUT CHANGE
+   ========================================================= */
 
-        dropZone.classList.remove(
-            "dragging"
-        );
+resumeInput.addEventListener("change", function () {
 
+    const file =
+        this.files && this.files[0];
+
+    handleFile(file);
+});
+
+
+/* =========================================================
+   DRAG ENTER
+   ========================================================= */
+
+dropZone.addEventListener("dragenter", function (event) {
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    dropZone.classList.add("drag-over");
+});
+
+
+/* =========================================================
+   DRAG OVER
+   ========================================================= */
+
+dropZone.addEventListener("dragover", function (event) {
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    dropZone.classList.add("drag-over");
+});
+
+
+/* =========================================================
+   DRAG LEAVE
+   ========================================================= */
+
+dropZone.addEventListener("dragleave", function (event) {
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!dropZone.contains(event.relatedTarget)) {
+        dropZone.classList.remove("drag-over");
     }
-);
+});
 
 
-dropZone.addEventListener(
-    "drop",
-    function (event) {
+/* =========================================================
+   DROP
+   ========================================================= */
 
-        event.preventDefault();
+dropZone.addEventListener("drop", function (event) {
 
-        dropZone.classList.remove(
-            "dragging"
-        );
+    event.preventDefault();
+    event.stopPropagation();
 
-
-        const file =
-            event.dataTransfer.files[0];
+    dropZone.classList.remove("drag-over");
 
 
-        if (!file) return;
+    const files =
+        event.dataTransfer.files;
 
+
+    if (!files || files.length === 0) {
+        return;
+    }
+
+
+    const file = files[0];
+
+
+    try {
 
         const dataTransfer =
             new DataTransfer();
 
-
         dataTransfer.items.add(file);
-
 
         resumeInput.files =
             dataTransfer.files;
 
+    } catch (error) {
 
-        handleFile(file);
-
+        console.warn(
+            "Could not synchronize dropped file with input.",
+            error
+        );
     }
-);
 
 
-/* =========================================
+    handleFile(file);
+});
+
+
+/* =========================================================
    ANALYZE BUTTON
-========================================= */
+   ========================================================= */
 
 analyzeButton.addEventListener(
     "click",
-    async function () {
+    function () {
 
-        const file =
-            resumeInput.files[0];
-
-
-        if (!file) {
+        if (!selectedResume) {
 
             showMessage(
-                "Please select your resume first.",
-                "error"
+                "Please select a PDF resume first."
             );
 
             return;
         }
 
 
-        analyzeButton.disabled =
-            true;
+        startAnalysis(selectedResume);
+    }
+);
 
 
-        analyzeButton
-            .querySelector("span")
-            .textContent =
-            "Analyzing...";
+/* =========================================================
+   START ANALYSIS
+   ========================================================= */
+
+async function startAnalysis(file) {
+
+    hideMessage();
+
+    analyzeButton.disabled = true;
+
+    showLoading();
+
+    resetAnalysisSteps();
+
+    setStepActive("step-upload");
 
 
-        showLoading();
+    /*
+       IMPORTANT FIX:
+       Scroll directly to the loading section.
+
+       Previously this used window.scrollTo({ top: 0 }),
+       which kept the user at the top of the website.
+    */
+
+    setTimeout(function () {
+
+        analysisLoading.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+
+    }, 50);
 
 
-        const formData =
-            new FormData();
+    try {
 
+        const formData = new FormData();
 
         formData.append(
             "resume",
@@ -194,927 +366,883 @@ analyzeButton.addEventListener(
         );
 
 
-        try {
-
-            const response =
-                await fetch(
-                    "/analyze",
-                    {
-                        method: "POST",
-
-                        body: formData
-                    }
-                );
+        const response =
+            await fetch(
+                "/analyze",
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
 
 
-            if (!response.ok) {
+        if (!response.ok) {
 
-                throw new Error(
-                    "Server returned an error."
-                );
+            throw new Error(
+                `Server returned ${response.status}`
+            );
+        }
 
+
+        if (!response.body) {
+
+            throw new Error(
+                "Streaming response is not supported by this browser."
+            );
+        }
+
+
+        await readSSEStream(response);
+
+
+    } catch (error) {
+
+        console.error(
+            "RefineCV analysis error:",
+            error
+        );
+
+
+        hideLoading();
+
+        analyzeButton.disabled = false;
+
+
+        showMessage(
+            "Something went wrong while analyzing the resume. Please try again."
+        );
+    }
+}
+
+
+/* =========================================================
+   SSE STREAM READER
+   ========================================================= */
+
+async function readSSEStream(response) {
+
+    const reader =
+        response.body.getReader();
+
+    const decoder =
+        new TextDecoder("utf-8");
+
+    let buffer = "";
+
+
+    while (true) {
+
+        const {
+            value,
+            done
+        } = await reader.read();
+
+
+        if (done) {
+            break;
+        }
+
+
+        buffer += decoder.decode(
+            value,
+            {
+                stream: true
+            }
+        );
+
+
+        const events =
+            buffer.split(/\r?\n\r?\n/);
+
+
+        buffer =
+            events.pop() || "";
+
+
+        for (const eventBlock of events) {
+
+            processSSEEvent(eventBlock);
+        }
+    }
+
+
+    if (buffer.trim()) {
+
+        processSSEEvent(buffer);
+    }
+}
+
+
+/* =========================================================
+   PROCESS SSE EVENT
+   ========================================================= */
+
+function processSSEEvent(eventBlock) {
+
+    if (!eventBlock.trim()) {
+        return;
+    }
+
+
+    const lines =
+        eventBlock.split(/\r?\n/);
+
+
+    let eventName = "message";
+
+    const dataLines = [];
+
+
+    for (const line of lines) {
+
+        if (line.startsWith("event:")) {
+
+            eventName =
+                line.substring(6).trim();
+
+        } else if (line.startsWith("data:")) {
+
+            dataLines.push(
+                line.substring(5).trim()
+            );
+        }
+    }
+
+
+    const data =
+        dataLines.join("\n");
+
+
+    if (!data) {
+        return;
+    }
+
+
+    switch (eventName) {
+
+        case "status":
+
+            handleStatus(data);
+
+            break;
+
+
+        case "result":
+
+            handleResult(data);
+
+            break;
+
+
+        case "error":
+
+            handleServerError(data);
+
+            break;
+
+
+        default:
+
+            console.log(
+                "RefineCV SSE event:",
+                eventName,
+                data
+            );
+    }
+}
+
+
+/* =========================================================
+   STATUS EVENTS
+   ========================================================= */
+
+function handleStatus(status) {
+
+    switch (status) {
+
+        case "upload":
+
+            setStepActive("step-upload");
+
+            break;
+
+
+        case "extracting":
+
+            setStepCompleted("step-upload");
+
+            setStepActive("step-extract");
+
+            break;
+
+
+        case "extracted":
+
+            setStepCompleted("step-extract");
+
+            break;
+
+
+        case "ocr":
+
+            setStepCompleted("step-extract");
+
+            setStepActive("step-ocr");
+
+            break;
+
+
+        case "ocr-complete":
+
+            setStepCompleted("step-ocr");
+
+            break;
+
+
+        case "ai-analysis":
+
+            if (
+                !document
+                    .getElementById("step-ocr")
+                    .classList.contains("completed")
+            ) {
+
+                setStepSkipped("step-ocr");
             }
 
 
-            const result =
-                await response.json();
+            setStepActive("step-ai");
 
+            break;
+
+
+        case "recommendations":
+
+            setStepCompleted("step-ai");
+
+            setStepActive("step-final");
+
+            break;
+
+
+        default:
 
             console.log(
-                "AI Analysis:",
-                result
+                "Unknown RefineCV status:",
+                status
             );
+    }
+}
 
 
-            displayResults(
-                result
-            );
+/* =========================================================
+   RESULT
+   ========================================================= */
+
+function handleResult(rawData) {
+
+    try {
+
+        const result =
+            JSON.parse(rawData);
 
 
-        } catch (error) {
-
-            console.error(
-                "Analysis error:",
-                error
-            );
+        completeAllSteps();
 
 
-            removeLoading();
+        setTimeout(function () {
+
+            hideLoading();
+
+            renderResults(result);
+
+            resultsSection.hidden = false;
 
 
-            showMessage(
-                "Something went wrong while analyzing your resume.",
-                "error"
-            );
+            resultsSection.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
 
 
-        } finally {
+            analyzeButton.disabled = false;
 
-            analyzeButton.disabled =
-                false;
+        }, 450);
 
 
-            analyzeButton
-                .querySelector("span")
-                .textContent =
-                "Analyze Resume";
+    } catch (error) {
 
+        console.error(
+            "Could not parse AI result:",
+            error,
+            rawData
+        );
+
+
+        hideLoading();
+
+        analyzeButton.disabled = false;
+
+
+        showMessage(
+            "The AI returned an unexpected result. Please try again."
+        );
+    }
+}
+
+
+/* =========================================================
+   SERVER ERROR
+   ========================================================= */
+
+function handleServerError(message) {
+
+    console.error(
+        "Server error:",
+        message
+    );
+
+
+    hideLoading();
+
+    analyzeButton.disabled = false;
+
+
+    showMessage(
+        "Resume analysis failed. Please check your resume and try again."
+    );
+}
+
+
+/* =========================================================
+   LOADING
+   ========================================================= */
+
+function showLoading() {
+
+    resultsSection.hidden = true;
+
+    analysisLoading.hidden = false;
+}
+
+
+function hideLoading() {
+
+    analysisLoading.hidden = true;
+}
+
+
+function resetAnalysisSteps() {
+
+    const steps =
+        document.querySelectorAll(
+            ".analysis-step"
+        );
+
+
+    steps.forEach(function (step) {
+
+        step.classList.remove(
+            "active",
+            "completed",
+            "skipped"
+        );
+    });
+}
+
+
+/* =========================================================
+   STEP HELPERS
+   ========================================================= */
+
+function getStep(id) {
+
+    return document.getElementById(id);
+}
+
+
+function setStepActive(id) {
+
+    const step =
+        getStep(id);
+
+    if (!step) {
+        return;
+    }
+
+
+    step.classList.add("active");
+
+    step.classList.remove(
+        "completed",
+        "skipped"
+    );
+}
+
+
+function setStepCompleted(id) {
+
+    const step =
+        getStep(id);
+
+    if (!step) {
+        return;
+    }
+
+
+    step.classList.remove(
+        "active",
+        "skipped"
+    );
+
+    step.classList.add("completed");
+}
+
+
+function setStepSkipped(id) {
+
+    const step =
+        getStep(id);
+
+    if (!step) {
+        return;
+    }
+
+
+    step.classList.remove(
+        "active",
+        "completed"
+    );
+
+    step.classList.add("skipped");
+}
+
+
+function completeAllSteps() {
+
+    const stepIds = [
+        "step-upload",
+        "step-extract",
+        "step-ai",
+        "step-final"
+    ];
+
+
+    stepIds.forEach(function (id) {
+
+        setStepCompleted(id);
+
+    });
+
+
+    const ocrStep =
+        getStep("step-ocr");
+
+
+    if (
+        ocrStep &&
+        !ocrStep.classList.contains("completed")
+    ) {
+
+        setStepSkipped("step-ocr");
+    }
+}
+
+
+/* =========================================================
+   RESULTS RENDERING
+   ========================================================= */
+
+function renderResults(result) {
+
+    const score =
+        Number.isFinite(Number(result.score))
+            ? Number(result.score)
+            : 0;
+
+
+    const summary =
+        result.summary ||
+        "No summary was returned.";
+
+
+    resultsContent.innerHTML = `
+
+        <div class="score-card">
+
+            <div>
+
+                <div class="result-label">
+                    OVERALL RESUME SCORE
+                </div>
+
+                <div class="score-circle">
+
+                    <div class="score-inner">
+
+                        <div class="score-number">
+                            ${score}
+                        </div>
+
+                        <div class="score-max">
+                            out of 100
+                        </div>
+
+                        <div class="score-status">
+                            ${escapeHTML(
+                                getScoreStatus(score)
+                            )}
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div>
+
+                <div class="result-label">
+                    EXECUTIVE SUMMARY
+                </div>
+
+                <p class="result-summary">
+                    ${escapeHTML(summary)}
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="results-grid">
+
+            ${createResultCard(
+                "Strongest Skills",
+                result.strongestSkills,
+                "Your strongest areas based on the resume."
+            )}
+
+
+            ${createResultCard(
+                "Missing or Weak Skills",
+                result.missingOrWeakSkills,
+                "Skills or areas that may need improvement."
+            )}
+
+
+            ${createResultCard(
+                "Strengths",
+                result.strengths,
+                "What your resume is already doing well."
+            )}
+
+
+            ${createResultCard(
+                "Weaknesses",
+                result.weaknesses,
+                "Areas that could make your resume stronger."
+            )}
+
+
+            ${createTextResultCard(
+                "ATS Compatibility",
+                result.atsCompatibility
+            )}
+
+
+            ${createResultCard(
+                "Suggestions",
+                result.suggestions,
+                "Practical improvements you can make."
+            )}
+
+
+            ${createResultCard(
+                "Recommended Changes",
+                result.recommendedChanges,
+                "Specific changes worth prioritizing."
+            )}
+
+        </div>
+
+    `;
+}
+
+
+/* =========================================================
+   RESULT CARD
+   ========================================================= */
+
+function createResultCard(
+    title,
+    items,
+    description
+) {
+
+    const safeItems =
+        Array.isArray(items)
+            ? items
+            : [];
+
+
+    return `
+
+        <article class="result-card">
+
+            <div class="result-label">
+                REFINECV INSIGHT
+            </div>
+
+            <h3>
+                ${escapeHTML(title)}
+            </h3>
+
+            <p>
+                ${escapeHTML(description)}
+            </p>
+
+            ${
+                safeItems.length
+                    ? `
+                        <ul class="result-list">
+
+                            ${safeItems
+                                .map(
+                                    item =>
+                                        `<li>${escapeHTML(
+                                            String(item)
+                                        )}</li>`
+                                )
+                                .join("")
+                            }
+
+                        </ul>
+                    `
+                    : `
+                        <p>
+                            Not mentioned.
+                        </p>
+                    `
+            }
+
+        </article>
+
+    `;
+}
+
+
+/* =========================================================
+   TEXT RESULT CARD
+   ========================================================= */
+
+function createTextResultCard(
+    title,
+    value
+) {
+
+    return `
+
+        <article class="result-card">
+
+            <div class="result-label">
+                REFINECV INSIGHT
+            </div>
+
+            <h3>
+                ${escapeHTML(title)}
+            </h3>
+
+            <p>
+                ${escapeHTML(
+                    value || "Not mentioned."
+                )}
+            </p>
+
+        </article>
+
+    `;
+}
+
+
+/* =========================================================
+   SCORE STATUS
+   ========================================================= */
+
+function getScoreStatus(score) {
+
+    if (score >= 85) {
+        return "Strong resume";
+    }
+
+    if (score >= 70) {
+        return "Good foundation";
+    }
+
+    if (score >= 55) {
+        return "Room to improve";
+    }
+
+    return "Needs refinement";
+}
+
+
+/* =========================================================
+   HTML ESCAPE
+   ========================================================= */
+
+function escapeHTML(value) {
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+/* =========================================================
+   ANALYZE ANOTHER RESUME
+   ========================================================= */
+
+analyzeAgain.addEventListener(
+    "click",
+    function () {
+
+        /*
+           1. Hide old results
+        */
+
+        resultsSection.hidden = true;
+
+
+        /*
+           2. Hide loading screen just in case
+        */
+
+        analysisLoading.hidden = true;
+
+
+        /*
+           3. Completely remove old selected file
+        */
+
+        selectedResume = null;
+
+        resumeInput.value = "";
+
+        selectedFile.textContent = "";
+
+        selectedFile.classList.remove(
+            "visible"
+        );
+
+
+        /*
+           4. Reset upload area text
+        */
+
+        dropTitle.textContent =
+            "Drop your resume here";
+
+        dropSubtitle.textContent =
+            "or click anywhere here to browse";
+
+
+        /*
+           5. Disable Analyze until
+              a new PDF is selected
+        */
+
+        analyzeButton.disabled = true;
+
+
+        /*
+           6. Reset all analysis steps
+        */
+
+        resetAnalysisSteps();
+
+
+        /*
+           7. Clear previous result HTML
+        */
+
+        resultsContent.innerHTML = "";
+
+
+        /*
+           8. Scroll back to the upload card.
+              The upload card is inside the hero section.
+        */
+
+        const uploadCard =
+            document.querySelector(".upload-card");
+
+
+        if (uploadCard) {
+
+            uploadCard.scrollIntoView({
+                behavior: "smooth",
+                block: "center"
+            });
+
+        } else {
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
         }
 
     }
 );
 
 
-/* =========================================
-   LOADING SCREEN
-========================================= */
-
-function showLoading() {
-
-    removeResults();
-
-
-    const loading =
-        document.createElement(
-            "section"
-        );
-
-
-    loading.id =
-        "analysisLoading";
-
-
-    loading.className =
-        "analysis-loading";
-
-
-    loading.innerHTML = `
-
-        <div class="loading-header">
-
-            <div class="loading-icon">
-                ✦
-            </div>
-
-            <h2>
-                Analyzing your resume
-            </h2>
-
-            <p>
-                ResumeAI is carefully reviewing
-                your resume.
-            </p>
-
-        </div>
-
-
-        <div class="analysis-steps">
-
-
-            <div
-                class="analysis-step active"
-                id="step-upload"
-            >
-
-                <div class="step-status">
-
-                    <span class="step-spinner"></span>
-
-                </div>
-
-                <div class="step-content">
-
-                    <strong>
-                        Resume uploaded
-                    </strong>
-
-                    <span>
-                        Preparing your document
-                    </span>
-
-                </div>
-
-            </div>
-
-
-
-            <div
-                class="analysis-step"
-                id="step-extract"
-            >
-
-                <div class="step-status">
-
-                    <span class="step-number-small">
-                        2
-                    </span>
-
-                </div>
-
-                <div class="step-content">
-
-                    <strong>
-                        Extracting resume content
-                    </strong>
-
-                    <span>
-                        Reading information from your PDF
-                    </span>
-
-                </div>
-
-            </div>
-
-
-
-            <div
-                class="analysis-step"
-                id="step-ocr"
-            >
-
-                <div class="step-status">
-
-                    <span class="step-number-small">
-                        3
-                    </span>
-
-                </div>
-
-                <div class="step-content">
-
-                    <strong>
-                        Reading with OCR
-                    </strong>
-
-                    <span>
-                        Understanding your resume visually
-                    </span>
-
-                </div>
-
-            </div>
-
-
-
-            <div
-                class="analysis-step"
-                id="step-ai"
-            >
-
-                <div class="step-status">
-
-                    <span class="step-number-small">
-                        4
-                    </span>
-
-                </div>
-
-                <div class="step-content">
-
-                    <strong>
-                        AI analysis
-                    </strong>
-
-                    <span>
-                        Analyzing skills, experience and content
-                    </span>
-
-                </div>
-
-            </div>
-
-
-
-            <div
-                class="analysis-step"
-                id="step-final"
-            >
-
-                <div class="step-status">
-
-                    <span class="step-number-small">
-                        5
-                    </span>
-
-                </div>
-
-                <div class="step-content">
-
-                    <strong>
-                        Generating recommendations
-                    </strong>
-
-                    <span>
-                        Preparing your personalized insights
-                    </span>
-
-                </div>
-
-            </div>
-
-
-        </div>
-
-
-        <div class="loading-footer">
-
-            <span class="mini-pulse"></span>
-
-            This may take a few moments...
-
-        </div>
-
-    `;
-
-
-    document
-        .querySelector("main")
-        .appendChild(loading);
-
-
-    loading.scrollIntoView({
-        behavior: "smooth"
-    });
-
-
-    startAnalysisAnimation();
-
-}
-
-
-/* =========================================
-   LOADING ANIMATION
-========================================= */
-
-function startAnalysisAnimation() {
-
-    const steps = [
-
-        "step-upload",
-        "step-extract",
-        "step-ocr",
-        "step-ai",
-        "step-final"
-
-    ];
-
-
-    let currentStep = 0;
-
-
-    const interval =
-        setInterval(
-            () => {
-
-
-                const current =
-                    document.getElementById(
-                        steps[currentStep]
-                    );
-
-
-                if (current) {
-
-                    current.classList.remove(
-                        "active"
-                    );
-
-                    current.classList.add(
-                        "completed"
-                    );
-
-
-                    current
-                        .querySelector(
-                            ".step-status"
-                        )
-                        .innerHTML =
-                        `<span class="step-check">✓</span>`;
-
-                }
-
-
-                currentStep++;
-
-
-                if (
-                    currentStep <
-                    steps.length
-                ) {
-
-                    const next =
-                        document.getElementById(
-                            steps[currentStep]
-                        );
-
-
-                    if (next) {
-
-                        next.classList.add(
-                            "active"
-                        );
-
-
-                        next
-                            .querySelector(
-                                ".step-status"
-                            )
-                            .innerHTML =
-                            `<span class="step-spinner"></span>`;
-
-                    }
-
-                } else {
-
-                    clearInterval(
-                        interval
-                    );
-
-                }
-
-
-            },
-            1200
-        );
-
-}
-
-
-/* =========================================
-   DISPLAY RESULTS
-========================================= */
-
-function displayResults(data) {
-
-    removeLoading();
-
-    removeResults();
-
-
-    const score =
-        Number(data.score) || 0;
-
-
-    const results =
-        document.createElement(
-            "section"
-        );
-
-
-    results.id =
-        "results";
-
-
-    results.className =
-        "results-section";
-
-
-    results.innerHTML = `
-
-        <div class="results-heading">
-
-            <span class="section-label">
-                AI ANALYSIS
-            </span>
-
-            <h2>
-                Your Resume Analysis
-            </h2>
-
-            <p>
-                Here is what our AI found in your resume.
-            </p>
-
-        </div>
-
-
-
-        <!-- SCORE -->
-
-        <div class="score-card">
-
-            <div>
-
-                <span class="result-label">
-                    OVERALL SCORE
-                </span>
-
-                <h3>
-
-                    ${score}
-
-                    <span>
-                        /100
-                    </span>
-
-                </h3>
-
-
-                <p class="score-status">
-
-                    ${getScoreStatus(score)}
-
-                </p>
-
-
-                <p>
-
-                    Based on resume quality,
-                    skills and ATS readiness.
-
-                </p>
-
-            </div>
-
-
-
-            <div
-                class="score-circle"
-                style="--score: ${score}"
-            >
-
-                <div class="score-inner">
-
-                    <span>
-                        ${score}
-                    </span>
-
-                    <small>
-                        /100
-                    </small>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-
-        <!-- SUMMARY -->
-
-        <div class="result-card">
-
-            <span class="result-label">
-
-                RESUME SUMMARY
-
-            </span>
-
-
-            <p>
-
-                ${escapeHTML(
-                    data.summary
-                )}
-
-            </p>
-
-        </div>
-
-
-
-        <!-- GRID -->
-
-        <div class="results-grid">
-
-
-            <div class="result-card">
-
-                <span class="result-label">
-
-                    STRONGEST SKILLS
-
-                </span>
-
-
-                ${createList(
-                    data.strongestSkills
-                )}
-
-            </div>
-
-
-
-            <div class="result-card">
-
-                <span class="result-label">
-
-                    MISSING / WEAK SKILLS
-
-                </span>
-
-
-                ${createList(
-                    data.missingOrWeakSkills
-                )}
-
-            </div>
-
-
-
-            <div class="result-card">
-
-                <span class="result-label">
-
-                    STRENGTHS
-
-                </span>
-
-
-                ${createList(
-                    data.strengths
-                )}
-
-            </div>
-
-
-
-            <div class="result-card">
-
-                <span class="result-label">
-
-                    WEAKNESSES
-
-                </span>
-
-
-                ${createList(
-                    data.weaknesses
-                )}
-
-            </div>
-
-
-        </div>
-
-
-
-        <!-- ATS -->
-
-        <div class="result-card">
-
-            <span class="result-label">
-
-                ATS COMPATIBILITY
-
-            </span>
-
-
-            <p>
-
-                ${escapeHTML(
-                    data.atsCompatibility
-                )}
-
-            </p>
-
-        </div>
-
-
-
-        <!-- SUGGESTIONS -->
-
-        <div class="result-card">
-
-            <span class="result-label">
-
-                AI IMPROVEMENT SUGGESTIONS
-
-            </span>
-
-
-            ${createList(
-                data.suggestions
-            )}
-
-        </div>
-
-
-
-        <!-- RECOMMENDATIONS -->
-
-        <div class="result-card">
-
-            <span class="result-label">
-
-                RECOMMENDED RESUME CHANGES
-
-            </span>
-
-
-            ${createList(
-                data.recommendedChanges
-            )}
-
-        </div>
-
-
-
-        <!-- ANALYZE AGAIN -->
-
-        <div class="analyze-again">
-
-            <button
-                type="button"
-                onclick="scrollToUpload()"
-            >
-
-                Analyze Another Resume →
-
-            </button>
-
-        </div>
-
-    `;
-
-
-    document
-        .querySelector("main")
-        .appendChild(results);
-
-
-    results.scrollIntoView({
-        behavior: "smooth"
-    });
-
-}
-
-
-/* =========================================
-   SCORE STATUS
-========================================= */
-
-function getScoreStatus(score) {
-
-    if (score >= 80) {
-
-        return "Excellent Resume";
-
-    }
-
-
-    if (score >= 65) {
-
-        return "Good Resume";
-
-    }
-
-
-    if (score >= 50) {
-
-        return "Needs Improvement";
-
-    }
-
-
-    return "Needs Major Improvement";
-
-}
-
-
-/* =========================================
-   CREATE LIST
-========================================= */
-
-function createList(items) {
-
-    if (
-        !items ||
-        !Array.isArray(items) ||
-        items.length === 0
-    ) {
-
-        return `
-            <p>
-                Not mentioned.
-            </p>
-        `;
-
-    }
-
-
-    return `
-
-        <ul class="result-list">
-
-            ${items
-                .map(
-                    item => `
-
-                        <li>
-                            ${escapeHTML(item)}
-                        </li>
-
-                    `
-                )
-                .join("")}
-
-        </ul>
-
-    `;
-
-}
-
-
-/* =========================================
-   HTML SAFETY
-========================================= */
-
-function escapeHTML(text) {
-
-    if (!text) return "";
-
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-
-    div.textContent =
-        String(text);
-
-
-    return div.innerHTML;
-
-}
-
-
-/* =========================================
+/* =========================================================
    MESSAGE
-========================================= */
+   ========================================================= */
 
-function showMessage(
-    message,
-    type
-) {
-
-    removeMessage();
-
-
-    const messageBox =
-        document.createElement(
-            "div"
-        );
-
-
-    messageBox.id =
-        "messageBox";
-
-
-    messageBox.className =
-        `message-box ${type}`;
-
+function showMessage(message) {
 
     messageBox.textContent =
         message;
 
-
-    document
-        .querySelector("main")
-        .appendChild(messageBox);
+    messageBox.hidden = false;
 
 
-    messageBox.scrollIntoView({
-        behavior: "smooth"
-    });
-
-
-    setTimeout(
-        () => {
-
-            if (messageBox) {
-
-                messageBox.remove();
-
-            }
-
-        },
-        4000
+    clearTimeout(
+        showMessage.timeout
     );
 
-}
 
+    showMessage.timeout =
+        setTimeout(
+            function () {
 
-/* =========================================
-   REMOVE LOADING
-========================================= */
+                hideMessage();
 
-function removeLoading() {
-
-    const loading =
-        document.getElementById(
-            "analysisLoading"
+            },
+            4500
         );
-
-
-    if (loading) {
-
-        loading.remove();
-
-    }
-
 }
 
 
-/* =========================================
-   REMOVE RESULTS
-========================================= */
+function hideMessage() {
 
-function removeResults() {
-
-    const results =
-        document.getElementById(
-            "results"
-        );
-
-
-    if (results) {
-
-        results.remove();
-
-    }
-
+    messageBox.hidden = true;
 }
 
 
-/* =========================================
-   REMOVE MESSAGE
-========================================= */
+/* =========================================================
+   INITIAL STATE
+   ========================================================= */
 
-function removeMessage() {
-
-    const message =
-        document.getElementById(
-            "messageBox"
-        );
+analyzeButton.disabled = true;
 
 
-    if (message) {
-
-        message.remove();
-
-    }
-
-}
-
-
-/* =========================================
-   ANALYZE ANOTHER
-========================================= */
-
-function scrollToUpload() {
-
-    removeResults();
-
-
-    document
-        .querySelector(
-            ".upload-card"
-        )
-        .scrollIntoView({
-            behavior: "smooth"
-        });
-
-}
+console.log(
+    "RefineCV frontend loaded successfully."
+);

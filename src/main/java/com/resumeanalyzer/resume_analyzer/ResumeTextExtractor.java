@@ -1,6 +1,7 @@
 package com.resumeanalyzer.resume_analyzer;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -14,40 +15,142 @@ import net.sourceforge.tess4j.TesseractException;
 @Service
 public class ResumeTextExtractor {
 
+    /*
+     * Old method.
+     *
+     * This keeps the extractor compatible with existing code.
+     * It simply calls the new method without sending progress updates.
+     */
     public String extractText(byte[] pdfBytes) throws IOException {
 
-        // First try normal PDF text extraction
-        try (PDDocument document = Loader.loadPDF(pdfBytes)) {
+        return extractText(
+                pdfBytes,
+                status -> {
+                    // No progress listener required here.
+                }
+        );
+    }
+
+
+    /*
+     * New method with progress reporting.
+     *
+     * Consumer<String> allows the caller
+     * to receive updates while extraction is happening.
+     */
+    public String extractText(
+            byte[] pdfBytes,
+            Consumer<String> progress
+    ) throws IOException {
+
+
+        // =========================================
+        // STEP 1 — EXTRACTING
+        // =========================================
+
+        progress.accept("extracting");
+
+
+        try (
+            PDDocument document =
+                    Loader.loadPDF(pdfBytes)
+        ) {
+
 
             PDFTextStripper stripper =
                     new PDFTextStripper();
 
+
             String text =
                     stripper.getText(document);
 
-            // If PDF already contains text, return it
-            if (text != null && !text.trim().isEmpty()) {
+
+            /*
+             * PDFBox successfully found text.
+             *
+             * OCR is not required.
+             */
+
+            if (
+                text != null &&
+                !text.trim().isEmpty()
+            ) {
+
+                progress.accept("extracted");
+
                 return text;
             }
 
-            // Otherwise use OCR
-            return extractUsingOCR(document);
+
+            /*
+             * PDF contains little/no readable text.
+             *
+             * This usually means it is an
+             * image-based/scanned resume.
+             */
+
+            progress.accept("extracted");
+
+
+            // =========================================
+            // STEP 2 — OCR
+            // =========================================
+
+            progress.accept("ocr");
+
+
+            String ocrText =
+                    extractUsingOCR(
+                            document
+                    );
+
+
+            progress.accept("ocr-complete");
+
+
+            return ocrText;
+
         }
     }
 
 
-    private String extractUsingOCR(PDDocument document) {
+    /*
+     * OCR extraction using Tesseract.
+     */
+    private String extractUsingOCR(
+            PDDocument document
+    ) {
 
-        Tesseract tesseract = new Tesseract();
 
-        // Location of tessdata folder
-        tesseract.setDatapath("tessdata");
+        Tesseract tesseract =
+                new Tesseract();
+
+
+        /*
+         * Location of tessdata folder.
+         *
+         * The project contains:
+         *
+         * tessdata/
+         *     eng.traineddata
+         */
+
+        tesseract.setDatapath(
+                "tessdata"
+        );
+
 
         // English language
-        tesseract.setLanguage("eng");
+        tesseract.setLanguage(
+                "eng"
+        );
+
 
         PDFRenderer renderer =
-                new PDFRenderer(document);
+                new PDFRenderer(
+                        document
+                );
+
 
         StringBuilder extractedText =
                 new StringBuilder();
@@ -55,15 +158,25 @@ public class ResumeTextExtractor {
 
         try {
 
+
+            /*
+             * Process every page of the PDF.
+             */
+
             for (
                 int page = 0;
                 page < document.getNumberOfPages();
                 page++
             ) {
 
-                // Render PDF page at 200 DPI
-                // Faster than 300 DPI while still
-                // providing good OCR quality for resumes.
+
+                /*
+                 * Render the PDF page as an image.
+                 *
+                 * 200 DPI gives a good balance
+                 * between OCR quality and speed.
+                 */
+
                 var image =
                         renderer.renderImageWithDPI(
                                 page,
@@ -71,13 +184,24 @@ public class ResumeTextExtractor {
                         );
 
 
-                // Run OCR
+                /*
+                 * Run Tesseract OCR.
+                 */
+
                 String pageText =
-                        tesseract.doOCR(image);
+                        tesseract.doOCR(
+                                image
+                        );
 
 
-                extractedText.append(pageText);
-                extractedText.append("\n");
+                extractedText.append(
+                        pageText
+                );
+
+
+                extractedText.append(
+                        "\n"
+                );
 
             }
 
@@ -86,9 +210,10 @@ public class ResumeTextExtractor {
 
 
         } catch (
-            IOException |
-            TesseractException e
+                IOException |
+                TesseractException e
         ) {
+
 
             throw new RuntimeException(
                     "OCR failed while reading resume.",
@@ -96,5 +221,7 @@ public class ResumeTextExtractor {
             );
 
         }
+
     }
+
 }

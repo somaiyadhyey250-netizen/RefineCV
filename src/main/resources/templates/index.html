@@ -1,457 +1,618 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
+        name="description"
+        content="RefineCV — AI-powered resume intelligence that helps you understand, improve and strengthen your resume."
     >
 
-    <title>ResumeAI — AI Resume Analyzer</title>
+    <title>RefineCV — Resume Intelligence</title>
 
-    <link
-        rel="stylesheet"
-        href="/style.css"
-    >
-
+    <link rel="stylesheet" href="/style.css">
 </head>
-
 
 <body>
 
+<!-- ========================= NAVBAR ========================= -->
 
 <header class="navbar">
 
     <a href="/" class="logo">
-
-        <span class="logo-icon">✦</span>
-
-        <span>ResumeAI</span>
-
+        <span class="logo-mark">R</span>
+        <span class="logo-text">RefineCV</span>
     </a>
 
-
     <nav class="nav-links">
-
-        <a href="#features">
-            Features
-        </a>
-
-        <a href="#how-it-works">
-            How it works
-        </a>
-
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
     </nav>
 
 </header>
 
 
-
 <main>
 
-
-<!-- =================================
-     HERO
-================================= -->
+<!-- ========================= HERO ========================= -->
 
 <section class="hero">
 
+    <div class="hero-left">
 
-    <div class="hero-content">
-
-
-        <div class="badge">
-
-            <span>✦</span>
-
-            AI-Powered Resume Analysis
-
+        <div class="eyebrow">
+            <span class="eyebrow-dot"></span>
+            AI-POWERED RESUME INTELLIGENCE
         </div>
 
-
         <h1>
-
-            Turn your resume into
-
-            <span>
-                a stronger career.
-            </span>
-
+            Turn your resume
+            <span>into a stronger career.</span>
         </h1>
 
-
         <p class="hero-description">
-
-            Upload your resume and let AI analyze your
-            skills, experience, ATS compatibility and
-            improvement areas.
-
+            RefineCV reads your resume, understands your experience,
+            identifies what is working, and shows you exactly where
+            you can improve.
         </p>
 
+        <div class="hero-meta">
+            <span>PDF analysis</span>
+            <span class="meta-separator">•</span>
+            <span>OCR support</span>
+            <span class="meta-separator">•</span>
+            <span>AI insights</span>
+        </div>
 
     </div>
 
 
-
-    <!-- UPLOAD CARD -->
+    <!-- ========================= UPLOAD CARD ========================= -->
 
     <div class="upload-card">
 
+        <div class="card-top">
 
-        <div class="upload-icon">
-            ↑
-        </div>
-
-
-        <h2>
-            Upload your resume
-        </h2>
-
-
-        <p class="upload-description">
-
-            Drag & drop your PDF here or choose a file
-
-        </p>
-
-
-
-        <label
-            for="resumeFile"
-            class="drop-zone"
-        >
-
-            <div class="drop-icon">
+            <div class="upload-symbol">
                 ↑
             </div>
 
+            <div class="card-kicker">
+                REFINE YOUR RESUME
+            </div>
 
-            <div class="drop-text">
+        </div>
 
-                <strong>
+        <h2>Analyze your resume</h2>
+
+        <p class="upload-description">
+            Upload your PDF and let RefineCV review its content,
+            skills, experience and ATS compatibility.
+        </p>
+
+
+        <!-- IMPORTANT:
+             The whole drop-zone is clickable.
+             JS explicitly opens #resumeFile.
+        -->
+
+        <div
+            class="drop-zone"
+            id="dropZone"
+            tabindex="0"
+            role="button"
+            aria-label="Upload resume PDF"
+        >
+
+            <input
+                type="file"
+                id="resumeFile"
+                accept=".pdf,application/pdf"
+            >
+
+            <div class="drop-zone-icon">
+                ↑
+            </div>
+
+            <div class="drop-zone-content">
+
+                <strong id="dropTitle">
                     Drop your resume here
                 </strong>
 
-                <span>
-                    or click to browse your files
+                <span id="dropSubtitle">
+                    or click anywhere here to browse
                 </span>
 
             </div>
 
-        </label>
-
-
-
-        <input
-            type="file"
-            id="resumeFile"
-            accept=".pdf"
-            hidden
-        >
-
-
-
-        <div class="file-info">
-
-            PDF files only · Max 5 MB
+            <div class="drop-zone-arrow">
+                →
+            </div>
 
         </div>
 
 
+        <div class="file-info">
+            <span>PDF only</span>
+            <span>•</span>
+            <span>Maximum 5 MB</span>
+        </div>
+
+
+        <!-- Selected file -->
 
         <div
             id="selectedFile"
             class="selected-file"
+            aria-live="polite"
         ></div>
 
 
+        <!-- Analyze -->
 
         <button
+            type="button"
             id="analyzeButton"
             class="analyze-button"
-            type="button"
+            disabled
         >
-
-            <span>
-                Analyze Resume
-            </span>
-
-            <span class="button-arrow">
-                →
-            </span>
-
+            <span>Analyze Resume</span>
+            <span class="button-arrow">→</span>
         </button>
 
-
     </div>
-
 
 </section>
 
 
-
-<!-- =================================
-     FEATURES
-================================= -->
+<!-- ========================= FEATURES ========================= -->
 
 <section
+    class="content-section features-section"
     id="features"
-    class="features-section"
 >
 
+    <div class="section-intro">
 
-    <div class="section-heading">
-
-        <span class="section-label">
-            WHAT YOU GET
-        </span>
-
+        <div class="section-label">
+            WHAT REFINECV ACTUALLY DOES
+        </div>
 
         <h2>
-            More than just a resume checker.
+            Not just a score.
+            <span>Useful feedback.</span>
         </h2>
 
-
         <p>
-            Get meaningful insights instead of a generic score.
+            RefineCV turns your resume into structured,
+            practical insights you can actually use.
         </p>
 
     </div>
 
 
+    <div class="feature-list">
 
-    <div class="features-grid">
+        <article class="feature-item">
 
-
-        <article class="feature-card">
-
-            <div class="feature-icon">
-                ◉
-            </div>
-
-            <h3>
-                ATS Analysis
-            </h3>
-
-            <p>
-
-                Understand how well your resume performs
-                against Applicant Tracking Systems.
-
-            </p>
-
-        </article>
-
-
-
-        <article class="feature-card">
-
-            <div class="feature-icon">
-                ◇
-            </div>
-
-            <h3>
-                Skill Analysis
-            </h3>
-
-            <p>
-
-                Identify your strongest skills and discover
-                important skills missing from your resume.
-
-            </p>
-
-        </article>
-
-
-
-        <article class="feature-card">
-
-            <div class="feature-icon">
-                ↗
-            </div>
-
-            <h3>
-                AI Suggestions
-            </h3>
-
-            <p>
-
-                Receive practical recommendations to make
-                your resume stronger and more relevant.
-
-            </p>
-
-        </article>
-
-
-    </div>
-
-
-</section>
-
-
-
-<!-- =================================
-     HOW IT WORKS
-================================= -->
-
-<section
-    id="how-it-works"
-    class="how-section"
->
-
-
-    <div class="section-heading">
-
-        <span class="section-label">
-            HOW IT WORKS
-        </span>
-
-
-        <h2>
-            Three steps. One better resume.
-        </h2>
-
-
-        <p>
-            From your PDF to actionable career insights.
-        </p>
-
-    </div>
-
-
-
-    <div class="steps">
-
-
-        <article class="step">
-
-            <div class="step-number">
+            <div class="feature-number">
                 01
             </div>
 
-            <h3>
-                Upload
-            </h3>
+            <div>
+                <h3>Understand your resume</h3>
 
-            <p>
-
-                Upload your resume as a PDF and let
-                ResumeAI prepare it for analysis.
-
-            </p>
+                <p>
+                    Extracts the actual content from your PDF,
+                    including scanned resumes through OCR.
+                </p>
+            </div>
 
         </article>
 
 
+        <article class="feature-item">
 
-        <article class="step">
-
-            <div class="step-number">
+            <div class="feature-number">
                 02
             </div>
 
-            <h3>
-                Analyze
-            </h3>
+            <div>
+                <h3>See your skill profile</h3>
 
-            <p>
-
-                Our Java backend extracts the resume
-                content and sends it for AI analysis.
-
-            </p>
+                <p>
+                    Highlights your strongest skills and identifies
+                    areas that may be missing or underdeveloped.
+                </p>
+            </div>
 
         </article>
 
 
+        <article class="feature-item">
 
-        <article class="step">
-
-            <div class="step-number">
+            <div class="feature-number">
                 03
             </div>
 
-            <h3>
-                Improve
-            </h3>
+            <div>
+                <h3>Know what to change</h3>
 
-            <p>
-
-                Get your score, strengths, weaknesses
-                and actionable improvement suggestions.
-
-            </p>
+                <p>
+                    Gives actionable suggestions and recommended
+                    changes instead of vague career advice.
+                </p>
+            </div>
 
         </article>
 
+    </div>
+
+</section>
+
+
+<!-- ========================= HOW IT WORKS ========================= -->
+
+<section
+    class="content-section process-section"
+    id="how-it-works"
+>
+
+    <div class="section-intro">
+
+        <div class="section-label">
+            HOW IT WORKS
+        </div>
+
+        <h2>
+            From your PDF
+            <span>to clear direction.</span>
+        </h2>
+
+        <p>
+            A simple processing pipeline works behind the scenes
+            to turn your resume into useful insights.
+        </p>
 
     </div>
 
 
+    <div class="process">
+
+        <div class="process-line"></div>
+
+
+        <article class="process-step">
+
+            <div class="process-index">
+                01
+            </div>
+
+            <div class="process-content">
+
+                <span>UPLOAD</span>
+
+                <h3>
+                    Give us your resume
+                </h3>
+
+                <p>
+                    Upload your existing PDF resume.
+                    Nothing needs to be manually entered.
+                </p>
+
+            </div>
+
+        </article>
+
+
+        <article class="process-step">
+
+            <div class="process-index">
+                02
+            </div>
+
+            <div class="process-content">
+
+                <span>UNDERSTAND</span>
+
+                <h3>
+                    Extract the content
+                </h3>
+
+                <p>
+                    RefineCV extracts text directly from the PDF
+                    and uses OCR when necessary.
+                </p>
+
+            </div>
+
+        </article>
+
+
+        <article class="process-step">
+
+            <div class="process-index">
+                03
+            </div>
+
+            <div class="process-content">
+
+                <span>REFINE</span>
+
+                <h3>
+                    Get your improvement plan
+                </h3>
+
+                <p>
+                    AI evaluates the resume and generates
+                    structured insights and recommendations.
+                </p>
+
+            </div>
+
+        </article>
+
+    </div>
+
 </section>
 
+
+<!-- ========================= LOADING ========================= -->
+
+<section
+    id="analysisLoading"
+    class="analysis-loading"
+    hidden
+>
+
+    <div class="loading-container">
+
+        <div class="loading-header">
+
+            <div class="loading-icon">
+                <span class="loading-pulse"></span>
+            </div>
+
+            <div>
+
+                <div class="loading-label">
+                    REFINECV ANALYSIS
+                </div>
+
+                <h2>
+                    Reading your resume.
+                </h2>
+
+                <p>
+                    We're working through your document step by step.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="analysis-steps">
+
+            <div
+                class="analysis-step"
+                id="step-upload"
+            >
+
+                <div class="step-status">
+                    <span class="step-spinner"></span>
+                    <span class="step-check">✓</span>
+                </div>
+
+                <span class="step-number-small">
+                    01
+                </span>
+
+                <div class="step-content">
+                    <strong>Resume uploaded</strong>
+                    <span>Preparing your document</span>
+                </div>
+
+            </div>
+
+
+            <div
+                class="analysis-step"
+                id="step-extract"
+            >
+
+                <div class="step-status">
+                    <span class="step-spinner"></span>
+                    <span class="step-check">✓</span>
+                </div>
+
+                <span class="step-number-small">
+                    02
+                </span>
+
+                <div class="step-content">
+                    <strong>Extracting resume content</strong>
+                    <span>Reading information from your PDF</span>
+                </div>
+
+            </div>
+
+
+            <div
+                class="analysis-step"
+                id="step-ocr"
+            >
+
+                <div class="step-status">
+                    <span class="step-spinner"></span>
+                    <span class="step-check">✓</span>
+                </div>
+
+                <span class="step-number-small">
+                    03
+                </span>
+
+                <div class="step-content">
+                    <strong>Reading with OCR</strong>
+                    <span>Understanding your resume visually</span>
+                </div>
+
+            </div>
+
+
+            <div
+                class="analysis-step"
+                id="step-ai"
+            >
+
+                <div class="step-status">
+                    <span class="step-spinner"></span>
+                    <span class="step-check">✓</span>
+                </div>
+
+                <span class="step-number-small">
+                    04
+                </span>
+
+                <div class="step-content">
+                    <strong>AI analysis</strong>
+                    <span>Analyzing skills, experience and content</span>
+                </div>
+
+            </div>
+
+
+            <div
+                class="analysis-step"
+                id="step-final"
+            >
+
+                <div class="step-status">
+                    <span class="step-spinner"></span>
+                    <span class="step-check">✓</span>
+                </div>
+
+                <span class="step-number-small">
+                    05
+                </span>
+
+                <div class="step-content">
+                    <strong>Generating recommendations</strong>
+                    <span>Preparing your personalized insights</span>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="loading-footer">
+            <span class="mini-pulse"></span>
+            This may take a few moments...
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================= RESULTS ========================= -->
+
+<section
+    id="resultsSection"
+    class="results-section"
+    hidden
+>
+
+    <div class="results-container">
+
+        <div class="results-heading">
+
+            <div>
+                <div class="section-label">
+                    RESUME ANALYSIS
+                </div>
+
+                <h2>
+                    Your resume,
+                    <span>refined.</span>
+                </h2>
+            </div>
+
+            <button
+                type="button"
+                id="analyzeAgain"
+                class="analyze-again"
+            >
+                Analyze Another Resume
+                <span>→</span>
+            </button>
+
+        </div>
+
+
+        <div id="resultsContent"></div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================= MESSAGE ========================= -->
+
+<div
+    id="messageBox"
+    class="message-box"
+    hidden
+></div>
 
 </main>
 
 
-
-<!-- =================================
-     FOOTER
-================================= -->
+<!-- ========================= FOOTER ========================= -->
 
 <footer class="footer">
 
+    <div class="footer-top">
 
-    <div class="footer-brand">
+        <a href="/" class="logo footer-logo">
+            <span class="logo-mark">R</span>
+            <span class="logo-text">RefineCV</span>
+        </a>
 
-        <span class="logo-icon">
-            ✦
-        </span>
-
-        <span>
-            ResumeAI
-        </span>
+        <p>
+            AI-powered resume intelligence.
+        </p>
 
     </div>
 
 
-    <p>
-        AI-powered resume analysis for smarter applications.
-    </p>
+    <div class="footer-bottom">
 
+        <p>
+            © 2026 RefineCV
+        </p>
 
-    <div class="footer-divider"></div>
+        <p>
+            Built by
+            <a
+                href="https://somaiyadhyey250-netizen.github.io/WebTechnology_P5/"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                Dhyey Somaiya ↗
+            </a>
+        </p>
 
-
-    <p class="developer-credit">
-
-        Developed by
-        <strong>
-            Dhyey Somaiya
-        </strong>
-
-    </p>
-
-
-    <p class="copyright">
-
-        © 2026 ResumeAI. All rights reserved.
-
-    </p>
-
+    </div>
 
 </footer>
 
 
-
 <script src="/script.js"></script>
 
-
 </body>
-
 </html>

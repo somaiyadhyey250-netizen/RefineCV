@@ -24,6 +24,10 @@ const resultsContent = document.getElementById("resultsContent");
 const analyzeAgain = document.getElementById("analyzeAgain");
 
 const messageBox = document.getElementById("messageBox");
+const improveResumeButton = document.getElementById("improveResumeButton");
+const improvementContainer = document.getElementById("improvementContainer");
+const improvementLoading = document.getElementById("improvementLoading");
+const improvementContent = document.getElementById("improvementContent");
 
 
 /* =========================================================
@@ -31,8 +35,21 @@ const messageBox = document.getElementById("messageBox");
    ========================================================= */
 
 let selectedResume = null;
+let terminalEventReceived = false;
+let currentAnalysisId = null;
+let currentAnalysisResult = null;
+let isImproving = false;
+let isAnalyzing = false;
+let statusPollingTimer = null;
+const ACTIVE_ANALYSIS_STORAGE_KEY = "refinecv_active_analysis_id";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+function getScrollBehavior() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth";
+}
 
 
 /* =========================================================
@@ -327,7 +344,16 @@ analyzeButton.addEventListener(
 
 async function startAnalysis(file) {
 
+    if (isAnalyzing) {
+        console.warn("Analysis is already in progress. Ignoring duplicate request.");
+        return;
+    }
+    isAnalyzing = true;
+    stopStatusPolling();
+
     hideMessage();
+
+    terminalEventReceived = false;
 
     analyzeButton.disabled = true;
 
@@ -349,7 +375,7 @@ async function startAnalysis(file) {
     setTimeout(function () {
 
         analysisLoading.scrollIntoView({
-            behavior: "smooth",
+            behavior: getScrollBehavior(),
             block: "start"
         });
 
@@ -377,10 +403,23 @@ async function startAnalysis(file) {
 
 
         if (!response.ok) {
+            isAnalyzing = false;
+            stopStatusPolling();
+            sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
+            const message = response.status === 413
+                ? "Resume file is too large. Please upload a smaller PDF."
+                : "Something went wrong while analyzing the resume. Please try again.";
 
-            throw new Error(
-                `Server returned ${response.status}`
-            );
+            hideLoading();
+            analyzeButton.disabled = false;
+            showMessage(message);
+            return;
+        }
+
+        const headerAnalysisId = response.headers.get("X-Analysis-Id");
+        if (headerAnalysisId) {
+            currentAnalysisId = headerAnalysisId.trim();
+            sessionStorage.setItem(ACTIVE_ANALYSIS_STORAGE_KEY, currentAnalysisId);
         }
 
 
@@ -393,16 +432,23 @@ async function startAnalysis(file) {
 
 
         await readSSEStream(response);
+        if (!terminalEventReceived && currentAnalysisId) {
+            console.info("SSE stream ended before terminal event; recovering for:", currentAnalysisId);
+            await recoverAnalysisStatus(currentAnalysisId);
+        }
 
 
     } catch (error) {
 
-        console.error(
-            "RefineCV analysis error:",
-            error
-        );
+        if (!terminalEventReceived && currentAnalysisId) {
+            console.info("SSE error during read; recovering for:", currentAnalysisId);
+            await recoverAnalysisStatus(currentAnalysisId);
+            return;
+        }
 
-
+        isAnalyzing = false;
+        stopStatusPolling();
+        sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
         hideLoading();
 
         analyzeButton.disabled = false;
@@ -466,9 +512,15 @@ async function readSSEStream(response) {
     }
 
 
+    buffer += decoder.decode();
+
     if (buffer.trim()) {
 
         processSSEEvent(buffer);
+    }
+
+    if (!terminalEventReceived) {
+        return;
     }
 }
 
@@ -527,8 +579,18 @@ function processSSEEvent(eventBlock) {
             break;
 
 
+        case "analysis-id":
+            currentAnalysisId = data.trim();
+            sessionStorage.setItem(ACTIVE_ANALYSIS_STORAGE_KEY, currentAnalysisId);
+            break;
+
         case "result":
 
+            terminalEventReceived = true;
+
+            isAnalyzing = false;
+            stopStatusPolling();
+            sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
             handleResult(data);
 
             break;
@@ -536,6 +598,11 @@ function processSSEEvent(eventBlock) {
 
         case "error":
 
+            terminalEventReceived = true;
+
+            isAnalyzing = false;
+            stopStatusPolling();
+            sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
             handleServerError(data);
 
             break;
@@ -545,8 +612,7 @@ function processSSEEvent(eventBlock) {
 
             console.log(
                 "RefineCV SSE event:",
-                eventName,
-                data
+                eventName
             );
     }
 }
@@ -627,10 +693,7 @@ function handleStatus(status) {
 
         default:
 
-            console.log(
-                "Unknown RefineCV status:",
-                status
-            );
+            console.log("Unknown RefineCV status:", status);
     }
 }
 
@@ -644,7 +707,23 @@ function handleResult(rawData) {
     try {
 
         const result =
-            JSON.parse(rawData);
+            (typeof rawData === "string") ? JSON.parse(rawData) : rawData;
+
+        currentAnalysisResult = result;
+        terminalEventReceived = true;
+        isAnalyzing = false;
+        if (currentAnalysisId) {
+            sessionStorage.setItem("refinecv_last_completed_analysis_id", currentAnalysisId);
+        }
+        if (improvementContainer) {
+            improvementContainer.hidden = true;
+        }
+        if (improvementContent) {
+            improvementContent.innerHTML = "";
+        }
+        if (improveResumeButton) {
+            improveResumeButton.disabled = false;
+        }
 
 
         completeAllSteps();
@@ -660,7 +739,7 @@ function handleResult(rawData) {
 
 
             resultsSection.scrollIntoView({
-                behavior: "smooth",
+                behavior: getScrollBehavior(),
                 block: "start"
             });
 
@@ -671,13 +750,6 @@ function handleResult(rawData) {
 
 
     } catch (error) {
-
-        console.error(
-            "Could not parse AI result:",
-            error,
-            rawData
-        );
-
 
         hideLoading();
 
@@ -697,19 +769,13 @@ function handleResult(rawData) {
 
 function handleServerError(message) {
 
-    console.error(
-        "Server error:",
-        message
-    );
-
-
     hideLoading();
 
     analyzeButton.disabled = false;
 
 
     showMessage(
-        "Resume analysis failed. Please check your resume and try again."
+        message || "Resume analysis failed. Please check your resume and try again."
     );
 }
 
@@ -1116,6 +1182,15 @@ analyzeAgain.addEventListener(
         */
 
         resultsSection.hidden = true;
+        currentAnalysisId = null;
+        currentAnalysisResult = null;
+        isImproving = false;
+        if (improvementContainer) {
+            improvementContainer.hidden = true;
+        }
+        if (improvementContent) {
+            improvementContent.innerHTML = "";
+        }
 
 
         /*
@@ -1185,7 +1260,7 @@ analyzeAgain.addEventListener(
         if (uploadCard) {
 
             uploadCard.scrollIntoView({
-                behavior: "smooth",
+                behavior: getScrollBehavior(),
                 block: "center"
             });
 
@@ -1193,7 +1268,7 @@ analyzeAgain.addEventListener(
 
             window.scrollTo({
                 top: 0,
-                behavior: "smooth"
+                behavior: getScrollBehavior()
             });
         }
 
@@ -1237,8 +1312,401 @@ function hideMessage() {
 
 
 /* =========================================================
+   V4.1 AI RESUME IMPROVEMENT
+   ========================================================= */
+
+if (improveResumeButton) {
+    improveResumeButton.addEventListener("click", function () {
+        if (isImproving) {
+            return;
+        }
+
+        if (!currentAnalysisId && !currentAnalysisResult) {
+            showMessage("Please analyze your resume before requesting improvements.");
+            return;
+        }
+
+        requestImprovements();
+    });
+}
+
+async function requestImprovements() {
+    isImproving = true;
+    if (improveResumeButton) {
+        improveResumeButton.disabled = true;
+    }
+
+    if (improvementContainer) {
+        improvementContainer.hidden = false;
+    }
+    if (improvementLoading) {
+        improvementLoading.hidden = false;
+    }
+    if (improvementContent) {
+        improvementContent.hidden = true;
+    }
+
+    setTimeout(function () {
+        if (improvementLoading) {
+            improvementLoading.scrollIntoView({
+                behavior: getScrollBehavior(),
+                block: "center"
+            });
+        }
+    }, 50);
+
+    try {
+        const payload = {
+            analysisId: currentAnalysisId,
+            analysis: currentAnalysisResult
+        };
+
+        const response = await fetch("/improve", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            const errorMsg = (errorData && errorData.error)
+                ? errorData.error
+                : (response.status === 429
+                    ? "You're making requests too quickly. Please wait a little and try again."
+                    : "Failed to generate resume improvements. Please try again.");
+
+            throw new Error(errorMsg);
+        }
+
+        const improvementData = await response.json();
+        renderImprovements(improvementData);
+
+        if (improvementLoading) {
+            improvementLoading.hidden = true;
+        }
+        if (improvementContent) {
+            improvementContent.hidden = false;
+        }
+
+        setTimeout(function () {
+            if (improvementContainer) {
+                improvementContainer.scrollIntoView({
+                    behavior: getScrollBehavior(),
+                    block: "start"
+                });
+            }
+        }, 100);
+
+    } catch (err) {
+        if (improvementLoading) {
+            improvementLoading.hidden = true;
+        }
+        if (improvementContainer) {
+            improvementContainer.hidden = true;
+        }
+        showMessage(err.message || "Failed to generate resume improvements. Please try again.");
+    } finally {
+        isImproving = false;
+        if (improveResumeButton) {
+            improveResumeButton.disabled = false;
+        }
+    }
+}
+
+function renderImprovements(data) {
+    if (!improvementContent) {
+        return;
+    }
+
+    const bullets = Array.isArray(data.bulletImprovements) ? data.bulletImprovements : [];
+    const explanations = Array.isArray(data.improvementExplanations) ? data.improvementExplanations : [];
+    const actions = Array.isArray(data.actionableChanges) ? data.actionableChanges : [];
+    const summary = data.improvedSummary || "No improved summary generated.";
+
+    let html = `
+        <div class="improvement-header">
+            <div>
+                <h3>
+                    Refined Resume Enhancements
+                </h3>
+                <p class="improvement-subtitle">
+                    Action-oriented, fact-grounded rewrites derived strictly from your uploaded resume.
+                </p>
+                <p class="improvement-note">
+                    Review AI-generated changes for accuracy before using them in your resume.
+                </p>
+            </div>
+            <button type="button" id="copyAllImprovementsBtn" class="copy-all-btn">
+                📋 Copy All Improvements
+            </button>
+        </div>
+
+        <div class="improvement-summary-card">
+            <div class="summary-card-header">
+                <div>
+                    <span class="card-eyebrow">REFINED SUMMARY</span>
+                    <h4>Improved Professional Summary</h4>
+                </div>
+                <button type="button" class="copy-snippet-btn" data-copy="${escapeHTML(summary)}">
+                    📋 Copy Summary
+                </button>
+            </div>
+            <p class="improved-summary-text">${escapeHTML(summary)}</p>
+        </div>
+
+        <div class="improvement-bullets-container">
+            <div class="section-title-wrap">
+                <span class="card-eyebrow">EXPERIENCE & PROJECTS</span>
+                <h4>Bullet Point Makeovers</h4>
+                <p class="section-desc">Comparing your original resume bullets with high-impact active phrasing.</p>
+            </div>
+
+            <div class="bullet-cards-grid">
+    `;
+
+    bullets.forEach(function (bullet) {
+        html += `
+            <div class="bullet-card">
+                <div class="bullet-card-header">
+                    <span class="bullet-section-tag">${escapeHTML(bullet.section || "Experience")}</span>
+                    <button type="button" class="copy-snippet-btn" data-copy="${escapeHTML(bullet.improved)}">
+                        📋 Copy Bullet
+                    </button>
+                </div>
+
+                <div class="bullet-compare-row">
+                    <div class="bullet-box original-box">
+                        <span class="box-tag">ORIGINAL</span>
+                        <p>${escapeHTML(bullet.original)}</p>
+                    </div>
+
+                    <div class="bullet-box improved-box">
+                        <span class="box-tag">REFINED</span>
+                        <p>${escapeHTML(bullet.improved)}</p>
+                    </div>
+                </div>
+
+                <div class="bullet-explanation-callout">
+                    <span class="explanation-icon">💡</span>
+                    <span><strong>Why this works:</strong> ${escapeHTML(bullet.explanation)}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `
+            </div>
+        </div>
+
+        <div class="improvement-bottom-grid">
+            <div class="improvement-info-card">
+                <span class="card-eyebrow">STRATEGIC ENHANCEMENTS</span>
+                <h4>Key Improvements Applied</h4>
+                <ul class="improvement-check-list">
+                    ${explanations.map(exp => `<li>✓ ${escapeHTML(exp)}</li>`).join("")}
+                </ul>
+            </div>
+
+            <div class="improvement-info-card">
+                <span class="card-eyebrow">ACTIONABLE NEXT STEPS</span>
+                <h4>Recommended Next Steps</h4>
+                <ul class="improvement-action-list">
+                    ${actions.map(act => `<li>→ ${escapeHTML(act)}</li>`).join("")}
+                </ul>
+            </div>
+        </div>
+    `;
+
+    improvementContent.innerHTML = html;
+
+    attachCopyListeners(data);
+}
+
+function attachCopyListeners(data) {
+    const copyButtons = improvementContent.querySelectorAll(".copy-snippet-btn");
+    copyButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            const textToCopy = btn.getAttribute("data-copy");
+            if (textToCopy) {
+                copyTextToClipboard(textToCopy, btn, "📋 Copy");
+            }
+        });
+    });
+
+    const copyAllBtn = document.getElementById("copyAllImprovementsBtn");
+    if (copyAllBtn) {
+        copyAllBtn.addEventListener("click", function () {
+            const allText = buildAllImprovementsText(data);
+            copyTextToClipboard(allText, copyAllBtn, "📋 Copy All Improvements");
+        });
+    }
+}
+
+function buildAllImprovementsText(data) {
+    let output = "";
+    if (data.improvedSummary) {
+        output += "=== IMPROVED PROFESSIONAL SUMMARY ===\n" + data.improvedSummary + "\n\n";
+    }
+
+    if (Array.isArray(data.bulletImprovements) && data.bulletImprovements.length > 0) {
+        output += "=== IMPROVED BULLET POINTS ===\n";
+        data.bulletImprovements.forEach(function (b, idx) {
+            output += (idx + 1) + ". [" + (b.section || "Experience") + "]\n";
+            output += "Original: " + b.original + "\n";
+            output += "Refined:  " + b.improved + "\n";
+            output += "Rationale: " + b.explanation + "\n\n";
+        });
+    }
+
+    if (Array.isArray(data.actionableChanges) && data.actionableChanges.length > 0) {
+        output += "=== RECOMMENDED ACTIONS ===\n";
+        data.actionableChanges.forEach(function (a) {
+            output += "• " + a + "\n";
+        });
+    }
+
+    return output.trim();
+}
+
+function copyTextToClipboard(text, btnElement, defaultText) {
+    if (!navigator.clipboard) {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        try {
+            document.execCommand("copy");
+            showCopySuccess(btnElement, defaultText);
+        } catch (e) {
+            showMessage("Could not copy to clipboard. Please copy manually.");
+        }
+        document.body.removeChild(textarea);
+        return;
+    }
+
+    navigator.clipboard.writeText(text).then(function () {
+        showCopySuccess(btnElement, defaultText);
+    }).catch(function () {
+        showMessage("Could not copy to clipboard. Please copy manually.");
+    });
+}
+
+function showCopySuccess(btnElement, defaultText) {
+    const originalText = btnElement.textContent;
+    btnElement.textContent = "✓ Copied!";
+    btnElement.classList.add("copied");
+    setTimeout(function () {
+        btnElement.textContent = originalText;
+        btnElement.classList.remove("copied");
+    }, 2000);
+}
+
+
+/* =========================================================
    INITIAL STATE
    ========================================================= */
+
+/* =========================================================
+   ANALYSIS RECOVERY & POLLING (V4.1)
+   ========================================================= */
+
+async function recoverAnalysisStatus(analysisId) {
+    if (!analysisId) return;
+
+    try {
+        const response = await fetch("/analysis/" + encodeURIComponent(analysisId) + "/status");
+        if (!response.ok) {
+            if (response.status === 404) {
+                stopStatusPolling();
+                isAnalyzing = false;
+                sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
+                hideLoading();
+                analyzeButton.disabled = false;
+                showMessage("Analysis session expired or not found. Please analyze again.");
+            }
+            return;
+        }
+
+        const data = await response.json();
+        const status = data.status;
+
+        if (status === "COMPLETED") {
+            stopStatusPolling();
+            isAnalyzing = false;
+            sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
+            terminalEventReceived = true;
+            currentAnalysisId = data.analysisId;
+            handleResult(data.result);
+        } else if (status === "PROCESSING") {
+            isAnalyzing = true;
+            showLoading();
+            if (data.stage) {
+                handleStatus(data.stage);
+            }
+            startStatusPolling(analysisId);
+        } else if (status === "FAILED") {
+            stopStatusPolling();
+            isAnalyzing = false;
+            sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
+            terminalEventReceived = true;
+            hideLoading();
+            analyzeButton.disabled = false;
+            handleServerError(data.error || "We couldn't complete the AI analysis. Please try again.");
+        } else if (status === "CANCELLED") {
+            stopStatusPolling();
+            isAnalyzing = false;
+            sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
+            terminalEventReceived = true;
+            hideLoading();
+            analyzeButton.disabled = false;
+            showMessage("The analysis was cancelled. Please try again.");
+        }
+    } catch (err) {
+        console.warn("Status recovery check failed:", err);
+    }
+}
+
+function startStatusPolling(analysisId) {
+    if (statusPollingTimer) {
+        return;
+    }
+    statusPollingTimer = setInterval(function () {
+        recoverAnalysisStatus(analysisId);
+    }, 2000);
+}
+
+function stopStatusPolling() {
+    if (statusPollingTimer) {
+        clearInterval(statusPollingTimer);
+        statusPollingTimer = null;
+    }
+}
+
+document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+        if (isImproving) {
+            return;
+        }
+        const activeId = currentAnalysisId || sessionStorage.getItem(ACTIVE_ANALYSIS_STORAGE_KEY);
+        if (activeId && isAnalyzing) {
+            recoverAnalysisStatus(activeId);
+        }
+    }
+});
+
+window.addEventListener("DOMContentLoaded", function () {
+    const savedAnalysisId = sessionStorage.getItem(ACTIVE_ANALYSIS_STORAGE_KEY)
+        || sessionStorage.getItem("refinecv_last_completed_analysis_id");
+    if (savedAnalysisId) {
+        currentAnalysisId = savedAnalysisId;
+        recoverAnalysisStatus(savedAnalysisId);
+    }
+});
 
 analyzeButton.disabled = true;
 

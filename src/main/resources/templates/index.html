@@ -162,6 +162,11 @@
             <span class="button-arrow">→</span>
         </button>
 
+        <p class="privacy-notice">
+            RefineCV processes your uploaded resume. Extracted content is sent to the configured Google Gemini API for AI analysis.
+            Please avoid uploading information you do not want processed by the AI provider.
+        </p>
+
     </div>
 
 </section>
@@ -542,7 +547,18 @@
                 </h2>
             </div>
 
-            <button
+            <div class="results-actions">
+                <button
+                    type="button"
+                    id="improveResumeButton"
+                    class="improve-resume-btn"
+                >
+                    <span class="btn-sparkle">✨</span>
+                    Improve My Resume
+                    <span class="btn-arrow">→</span>
+                </button>
+
+                <button
                 type="button"
                 id="analyzeAgain"
                 class="analyze-again"
@@ -550,11 +566,25 @@
                 Analyze Another Resume
                 <span>→</span>
             </button>
+            </div>
 
         </div>
 
 
         <div id="resultsContent"></div>
+
+        <!-- ========================= V4.1 RESUME IMPROVEMENTS ========================= -->
+        <div id="improvementContainer" class="improvement-container" hidden>
+            <div id="improvementLoading" class="improvement-loading" hidden>
+                <div class="improvement-spinner"></div>
+                <div class="improvement-loading-text">
+                    <strong>Refining your resume with AI intelligence...</strong>
+                    <span>Polishing professional summary, active verbs, and bullet impact without inventing facts</span>
+                </div>
+            </div>
+
+            <div id="improvementContent" class="improvement-content" hidden></div>
+        </div>
 
     </div>
 

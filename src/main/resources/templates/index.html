@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -6,10 +6,10 @@
 
     <meta
         name="description"
-        content="RefineCV — AI-powered resume intelligence that helps you understand, improve and strengthen your resume."
+        content="RefineCV â€” AI-powered resume intelligence that helps you understand, improve and strengthen your resume."
     >
 
-    <title>RefineCV — Resume Intelligence</title>
+    <title>RefineCV â€” Resume Intelligence</title>
 
     <link rel="stylesheet" href="/style.css">
 </head>
@@ -59,9 +59,9 @@
 
         <div class="hero-meta">
             <span>PDF analysis</span>
-            <span class="meta-separator">•</span>
+            <span class="meta-separator">â€¢</span>
             <span>OCR support</span>
-            <span class="meta-separator">•</span>
+            <span class="meta-separator">â€¢</span>
             <span>AI insights</span>
         </div>
 
@@ -75,7 +75,7 @@
         <div class="card-top">
 
             <div class="upload-symbol">
-                ↑
+                â†‘
             </div>
 
             <div class="card-kicker">
@@ -90,6 +90,66 @@
             Upload your PDF and let RefineCV review its content,
             skills, experience and ATS compatibility.
         </p>
+
+
+        <!-- V4.2: ANALYSIS MODE SELECTION -->
+
+        <div class="mode-selection" id="modeSelection" aria-label="Choose analysis mode">
+
+            <div class="mode-selection-label">
+                ANALYSIS MODE
+            </div>
+
+            <div class="mode-cards">
+
+                <button
+                    type="button"
+                    id="modeCardGeneral"
+                    class="mode-card selected"
+                    aria-pressed="true"
+                    data-mode="GENERAL"
+                >
+                    <div class="mode-card-check" aria-hidden="true">&#10003;</div>
+                    <div class="mode-card-icon" aria-hidden="true">&#128196;</div>
+                    <span class="mode-card-title">General Analysis</span>
+                    <span class="mode-card-desc">Overall review of your resume &mdash; strengths, skills, ATS score, and improvements.</span>
+                </button>
+
+                <button
+                    type="button"
+                    id="modeCardJob"
+                    class="mode-card"
+                    aria-pressed="false"
+                    data-mode="SPECIFIC_JOB"
+                >
+                    <div class="mode-card-check" aria-hidden="true">&#10003;</div>
+                    <div class="mode-card-icon" aria-hidden="true">&#127919;</div>
+                    <span class="mode-card-title">Specific Job Analysis</span>
+                    <span class="mode-card-desc">Match your resume against a specific job description for targeted insights.</span>
+                </button>
+
+            </div>
+
+            <!-- Job description revealed only in Specific Job mode -->
+
+            <div class="job-description-wrapper" id="jobDescriptionWrapper">
+                <label class="job-description-label" for="jobDescriptionInput">
+                    Paste the job description below
+                </label>
+                <textarea
+                    id="jobDescriptionInput"
+                    class="job-description-textarea"
+                    rows="5"
+                    maxlength="8000"
+                    placeholder="Paste the full job posting or key requirements here..."
+                    aria-required="false"
+                ></textarea>
+                <p class="job-description-hint">
+                    The job description is used only to tailor the AI analysis. It is never stored beyond your session.
+                </p>
+            </div>
+
+        </div>
 
 
         <!-- IMPORTANT:
@@ -112,7 +172,7 @@
             >
 
             <div class="drop-zone-icon">
-                ↑
+                â†‘
             </div>
 
             <div class="drop-zone-content">
@@ -128,7 +188,7 @@
             </div>
 
             <div class="drop-zone-arrow">
-                →
+                â†’
             </div>
 
         </div>
@@ -136,7 +196,7 @@
 
         <div class="file-info">
             <span>PDF only</span>
-            <span>•</span>
+            <span>â€¢</span>
             <span>Maximum 5 MB</span>
         </div>
 
@@ -159,7 +219,7 @@
             disabled
         >
             <span>Analyze Resume</span>
-            <span class="button-arrow">→</span>
+            <span class="button-arrow">â†’</span>
         </button>
 
         <p class="privacy-notice">
@@ -409,7 +469,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">✓</span>
+                    <span class="step-check">âœ“</span>
                 </div>
 
                 <span class="step-number-small">
@@ -431,7 +491,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">✓</span>
+                    <span class="step-check">âœ“</span>
                 </div>
 
                 <span class="step-number-small">
@@ -453,7 +513,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">✓</span>
+                    <span class="step-check">âœ“</span>
                 </div>
 
                 <span class="step-number-small">
@@ -475,7 +535,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">✓</span>
+                    <span class="step-check">âœ“</span>
                 </div>
 
                 <span class="step-number-small">
@@ -497,7 +557,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">✓</span>
+                    <span class="step-check">âœ“</span>
                 </div>
 
                 <span class="step-number-small">
@@ -553,9 +613,9 @@
                     id="improveResumeButton"
                     class="improve-resume-btn"
                 >
-                    <span class="btn-sparkle">✨</span>
+                    <span class="btn-sparkle">âœ¨</span>
                     Improve My Resume
-                    <span class="btn-arrow">→</span>
+                    <span class="btn-arrow">â†’</span>
                 </button>
 
                 <button
@@ -564,7 +624,7 @@
                 class="analyze-again"
             >
                 Analyze Another Resume
-                <span>→</span>
+                <span>â†’</span>
             </button>
             </div>
 
@@ -623,7 +683,7 @@
     <div class="footer-bottom">
 
         <p>
-            © 2026 RefineCV
+            Â© 2026 RefineCV
         </p>
 
         <p>
@@ -633,7 +693,7 @@
                 target="_blank"
                 rel="noopener noreferrer"
             >
-                Dhyey Somaiya ↗
+                Dhyey Somaiya â†—
             </a>
         </p>
 

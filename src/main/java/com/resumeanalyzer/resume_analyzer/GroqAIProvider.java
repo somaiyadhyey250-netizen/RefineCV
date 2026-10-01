@@ -77,12 +77,24 @@ public class GroqAIProvider implements AIProvider {
 
     @Override
     public ResumeAnalysisDTO analyzeResume(String resumeText, Consumer<String> progress) {
+        return executeAnalysis(resumeText, AnalysisMode.GENERAL, null, progress);
+    }
+
+    @Override
+    public ResumeAnalysisDTO analyzeResumeForJob(String resumeText, String jobDescription, Consumer<String> progress) {
+        return executeAnalysis(resumeText, AnalysisMode.SPECIFIC_JOB, jobDescription, progress);
+    }
+
+    private ResumeAnalysisDTO executeAnalysis(String resumeText, AnalysisMode mode, String jobDescription, Consumer<String> progress) {
         if (!isAvailable()) {
             throw new AICommunicationException(getProviderName(), AIErrorCategory.AUTHENTICATION_FAILURE,
                     "Groq is not configured with an API key.", false, null);
         }
 
-        String prompt = AIPromptBuilder.buildAnalysisPrompt(resumeText);
+        String prompt = (mode == AnalysisMode.SPECIFIC_JOB && jobDescription != null && !jobDescription.isBlank())
+                ? AIPromptBuilder.buildJobAnalysisPrompt(resumeText, jobDescription)
+                : AIPromptBuilder.buildAnalysisPrompt(resumeText);
+
         Map<String, Object> requestBody = Map.of(
                 "model", model,
                 "messages", List.of(
@@ -94,7 +106,7 @@ public class GroqAIProvider implements AIProvider {
                         "json_schema", Map.of(
                                 "name", "resume_analysis",
                                 "strict", true,
-                                "schema", buildAnalysisJsonSchema()
+                                "schema", buildAnalysisJsonSchema(mode)
                         )
                 ),
                 "temperature", 0.2,
@@ -117,12 +129,24 @@ public class GroqAIProvider implements AIProvider {
 
     @Override
     public ResumeImprovementDTO improveResume(String resumeText, ResumeAnalysisDTO analysis) {
+        return executeImprovement(resumeText, analysis, null);
+    }
+
+    @Override
+    public ResumeImprovementDTO improveResumeForJob(String resumeText, ResumeAnalysisDTO analysis, String jobDescription) {
+        return executeImprovement(resumeText, analysis, jobDescription);
+    }
+
+    private ResumeImprovementDTO executeImprovement(String resumeText, ResumeAnalysisDTO analysis, String jobDescription) {
         if (!isAvailable()) {
             throw new AICommunicationException(getProviderName(), AIErrorCategory.AUTHENTICATION_FAILURE,
                     "Groq is not configured with an API key.", false, null);
         }
 
-        String prompt = AIPromptBuilder.buildImprovementPrompt(resumeText, analysis);
+        String prompt = (jobDescription != null && !jobDescription.isBlank())
+                ? AIPromptBuilder.buildJobImprovementPrompt(resumeText, analysis, jobDescription)
+                : AIPromptBuilder.buildImprovementPrompt(resumeText, analysis);
+
         Map<String, Object> requestBody = Map.of(
                 "model", model,
                 "messages", List.of(
@@ -297,23 +321,38 @@ public class GroqAIProvider implements AIProvider {
     }
 
     private Map<String, Object> buildAnalysisJsonSchema() {
+        return buildAnalysisJsonSchema(AnalysisMode.GENERAL);
+    }
+
+    private Map<String, Object> buildAnalysisJsonSchema(AnalysisMode mode) {
+        var properties = new java.util.HashMap<String, Object>();
+        properties.put("score", Map.of("type", "integer"));
+        properties.put("summary", Map.of("type", "string"));
+        properties.put("strongestSkills", Map.of("type", "array", "items", Map.of("type", "string")));
+        properties.put("missingOrWeakSkills", Map.of("type", "array", "items", Map.of("type", "string")));
+        properties.put("strengths", Map.of("type", "array", "items", Map.of("type", "string")));
+        properties.put("weaknesses", Map.of("type", "array", "items", Map.of("type", "string")));
+        properties.put("atsCompatibility", Map.of("type", "string"));
+        properties.put("suggestions", Map.of("type", "array", "items", Map.of("type", "string")));
+        properties.put("recommendedChanges", Map.of("type", "array", "items", Map.of("type", "string")));
+
+        var required = new java.util.ArrayList<>(List.of(
+                "score", "summary", "strongestSkills", "missingOrWeakSkills",
+                "strengths", "weaknesses", "atsCompatibility", "suggestions", "recommendedChanges"
+        ));
+
+        if (mode == AnalysisMode.SPECIFIC_JOB) {
+            properties.put("analysisMode", Map.of("type", "string"));
+            properties.put("jobMatchScore", Map.of("type", "integer"));
+            properties.put("keywordAlignment", Map.of("type", "string"));
+            properties.put("experienceAlignment", Map.of("type", "string"));
+            required.addAll(List.of("analysisMode", "jobMatchScore", "keywordAlignment", "experienceAlignment"));
+        }
+
         return Map.of(
                 "type", "object",
-                "properties", Map.of(
-                        "score", Map.of("type", "integer"),
-                        "summary", Map.of("type", "string"),
-                        "strongestSkills", Map.of("type", "array", "items", Map.of("type", "string")),
-                        "missingOrWeakSkills", Map.of("type", "array", "items", Map.of("type", "string")),
-                        "strengths", Map.of("type", "array", "items", Map.of("type", "string")),
-                        "weaknesses", Map.of("type", "array", "items", Map.of("type", "string")),
-                        "atsCompatibility", Map.of("type", "string"),
-                        "suggestions", Map.of("type", "array", "items", Map.of("type", "string")),
-                        "recommendedChanges", Map.of("type", "array", "items", Map.of("type", "string"))
-                ),
-                "required", List.of(
-                        "score", "summary", "strongestSkills", "missingOrWeakSkills",
-                        "strengths", "weaknesses", "atsCompatibility", "suggestions", "recommendedChanges"
-                ),
+                "properties", properties,
+                "required", required,
                 "additionalProperties", false
         );
     }

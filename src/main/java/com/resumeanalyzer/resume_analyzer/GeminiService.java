@@ -73,6 +73,24 @@ public class GeminiService implements AIProvider {
             String resumeText,
             Consumer<String> progress
     ) {
+        return executeAnalysis(resumeText, AnalysisMode.GENERAL, null, progress);
+    }
+
+    @Override
+    public ResumeAnalysisDTO analyzeResumeForJob(
+            String resumeText,
+            String jobDescription,
+            Consumer<String> progress
+    ) {
+        return executeAnalysis(resumeText, AnalysisMode.SPECIFIC_JOB, jobDescription, progress);
+    }
+
+    private ResumeAnalysisDTO executeAnalysis(
+            String resumeText,
+            AnalysisMode mode,
+            String jobDescription,
+            Consumer<String> progress
+    ) {
         if (!isAvailable()) {
             throw new GeminiCommunicationException("Gemini is not configured.", null);
         }
@@ -84,36 +102,10 @@ public class GeminiService implements AIProvider {
             throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
         }
 
-        Schema resumeSchema = Schema.builder()
-                .type("OBJECT")
-                .properties(
-                        Map.of(
-                                "score", Schema.builder().type("INTEGER").build(),
-                                "summary", Schema.builder().type("STRING").build(),
-                                "strongestSkills", Schema.builder().type("ARRAY")
-                                        .items(Schema.builder().type("STRING").build()).build(),
-                                "missingOrWeakSkills", Schema.builder().type("ARRAY")
-                                        .items(Schema.builder().type("STRING").build()).build(),
-                                "strengths", Schema.builder().type("ARRAY")
-                                        .items(Schema.builder().type("STRING").build()).build(),
-                                "weaknesses", Schema.builder().type("ARRAY")
-                                        .items(Schema.builder().type("STRING").build()).build(),
-                                "atsCompatibility", Schema.builder().type("STRING").build(),
-                                "suggestions", Schema.builder().type("ARRAY")
-                                        .items(Schema.builder().type("STRING").build()).build(),
-                                "recommendedChanges", Schema.builder().type("ARRAY")
-                                        .items(Schema.builder().type("STRING").build()).build()
-                        )
-                )
-                .required(
-                        List.of(
-                                "score", "summary", "strongestSkills", "missingOrWeakSkills",
-                                "strengths", "weaknesses", "atsCompatibility", "suggestions", "recommendedChanges"
-                        )
-                )
-                .build();
-
-        String prompt = buildPrompt(resumeText);
+        Schema resumeSchema = buildResumeSchema(mode);
+        String prompt = (mode == AnalysisMode.SPECIFIC_JOB && jobDescription != null && !jobDescription.isBlank())
+                ? AIPromptBuilder.buildJobAnalysisPrompt(resumeText, jobDescription)
+                : buildPrompt(resumeText);
 
         GenerateContentConfig config = GenerateContentConfig.builder()
                 .responseMimeType("application/json")
@@ -144,6 +136,44 @@ public class GeminiService implements AIProvider {
         return parseAndValidateResponse(result);
     }
 
+    private Schema buildResumeSchema(AnalysisMode mode) {
+        var properties = new java.util.HashMap<String, Schema>();
+        properties.put("score", Schema.builder().type("INTEGER").build());
+        properties.put("summary", Schema.builder().type("STRING").build());
+        properties.put("strongestSkills", Schema.builder().type("ARRAY")
+                .items(Schema.builder().type("STRING").build()).build());
+        properties.put("missingOrWeakSkills", Schema.builder().type("ARRAY")
+                .items(Schema.builder().type("STRING").build()).build());
+        properties.put("strengths", Schema.builder().type("ARRAY")
+                .items(Schema.builder().type("STRING").build()).build());
+        properties.put("weaknesses", Schema.builder().type("ARRAY")
+                .items(Schema.builder().type("STRING").build()).build());
+        properties.put("atsCompatibility", Schema.builder().type("STRING").build());
+        properties.put("suggestions", Schema.builder().type("ARRAY")
+                .items(Schema.builder().type("STRING").build()).build());
+        properties.put("recommendedChanges", Schema.builder().type("ARRAY")
+                .items(Schema.builder().type("STRING").build()).build());
+
+        var required = new java.util.ArrayList<>(List.of(
+                "score", "summary", "strongestSkills", "missingOrWeakSkills",
+                "strengths", "weaknesses", "atsCompatibility", "suggestions", "recommendedChanges"
+        ));
+
+        if (mode == AnalysisMode.SPECIFIC_JOB) {
+            properties.put("analysisMode", Schema.builder().type("STRING").build());
+            properties.put("jobMatchScore", Schema.builder().type("INTEGER").build());
+            properties.put("keywordAlignment", Schema.builder().type("STRING").build());
+            properties.put("experienceAlignment", Schema.builder().type("STRING").build());
+            required.addAll(List.of("analysisMode", "jobMatchScore", "keywordAlignment", "experienceAlignment"));
+        }
+
+        return Schema.builder()
+                .type("OBJECT")
+                .properties(properties)
+                .required(required)
+                .build();
+    }
+
     static String buildPrompt(String resumeText) {
         return AIPromptBuilder.buildAnalysisPrompt(resumeText);
     }
@@ -160,6 +190,23 @@ public class GeminiService implements AIProvider {
     public ResumeImprovementDTO improveResume(
             String resumeText,
             ResumeAnalysisDTO analysis
+    ) {
+        return executeImprovement(resumeText, analysis, null);
+    }
+
+    @Override
+    public ResumeImprovementDTO improveResumeForJob(
+            String resumeText,
+            ResumeAnalysisDTO analysis,
+            String jobDescription
+    ) {
+        return executeImprovement(resumeText, analysis, jobDescription);
+    }
+
+    private ResumeImprovementDTO executeImprovement(
+            String resumeText,
+            ResumeAnalysisDTO analysis,
+            String jobDescription
     ) {
         if (!isAvailable()) {
             throw new GeminiCommunicationException("Gemini is not configured.", null);
@@ -208,7 +255,9 @@ public class GeminiService implements AIProvider {
                 ))
                 .build();
 
-        String prompt = buildImprovementPrompt(resumeText, analysis);
+        String prompt = (jobDescription != null && !jobDescription.isBlank())
+                ? AIPromptBuilder.buildJobImprovementPrompt(resumeText, analysis, jobDescription)
+                : buildImprovementPrompt(resumeText, analysis);
 
         GenerateContentConfig config = GenerateContentConfig.builder()
                 .responseMimeType("application/json")

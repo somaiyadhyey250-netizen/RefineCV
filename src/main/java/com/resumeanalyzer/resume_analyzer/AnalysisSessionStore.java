@@ -21,8 +21,13 @@ public class AnalysisSessionStore {
             String analysisId,
             String resumeText,
             ResumeAnalysisDTO analysis,
+            AnalysisMode mode,
+            String jobDescription,
             Instant createdAt
     ) {
+        public Session(String analysisId, String resumeText, ResumeAnalysisDTO analysis, Instant createdAt) {
+            this(analysisId, resumeText, analysis, AnalysisMode.GENERAL, null, createdAt);
+        }
     }
 
     public static class FullSession {
@@ -32,18 +37,28 @@ public class AnalysisSessionStore {
         private volatile String resumeText;
         private volatile ResumeAnalysisDTO analysis;
         private volatile String provider;
+        private volatile AnalysisMode mode;
+        private volatile String jobDescription;
         private volatile String error;
         private final Instant createdAt;
         private volatile Instant updatedAt;
 
         public FullSession(String analysisId, AnalysisStatus status, String stage,
                            String resumeText, ResumeAnalysisDTO analysis, String provider, String error) {
+            this(analysisId, status, stage, resumeText, analysis, provider, AnalysisMode.GENERAL, null, error);
+        }
+
+        public FullSession(String analysisId, AnalysisStatus status, String stage,
+                           String resumeText, ResumeAnalysisDTO analysis, String provider,
+                           AnalysisMode mode, String jobDescription, String error) {
             this.analysisId = analysisId;
             this.status = status;
             this.stage = stage;
             this.resumeText = resumeText;
             this.analysis = analysis;
             this.provider = provider;
+            this.mode = mode != null ? mode : AnalysisMode.GENERAL;
+            this.jobDescription = jobDescription;
             this.error = error;
             this.createdAt = Instant.now();
             this.updatedAt = this.createdAt;
@@ -55,6 +70,8 @@ public class AnalysisSessionStore {
         public String getResumeText() { return resumeText; }
         public ResumeAnalysisDTO getAnalysis() { return analysis; }
         public String getProvider() { return provider; }
+        public AnalysisMode getMode() { return mode; }
+        public String getJobDescription() { return jobDescription; }
         public String getError() { return error; }
         public Instant getCreatedAt() { return createdAt; }
         public Instant getUpdatedAt() { return updatedAt; }
@@ -64,13 +81,19 @@ public class AnalysisSessionStore {
             this.updatedAt = Instant.now();
         }
 
-        public void complete(String resumeText, ResumeAnalysisDTO analysis, String provider) {
+        public void complete(String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription) {
             this.resumeText = resumeText;
             this.analysis = analysis;
             this.provider = provider;
+            this.mode = mode != null ? mode : AnalysisMode.GENERAL;
+            this.jobDescription = jobDescription;
             this.status = AnalysisStatus.COMPLETED;
             this.stage = "completed";
             this.updatedAt = Instant.now();
+        }
+
+        public void complete(String resumeText, ResumeAnalysisDTO analysis, String provider) {
+            complete(resumeText, analysis, provider, AnalysisMode.GENERAL, null);
         }
 
         public void fail(String error) {
@@ -91,7 +114,7 @@ public class AnalysisSessionStore {
         }
 
         public Session toLegacySession() {
-            return new Session(analysisId, resumeText, analysis, createdAt);
+            return new Session(analysisId, resumeText, analysis, mode, jobDescription, createdAt);
         }
     }
 
@@ -125,12 +148,24 @@ public class AnalysisSessionStore {
         }
     }
 
-    public void completeSession(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider) {
+    public void completeSession(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription) {
         if (analysisId == null || analysisId.isBlank()) return;
         cleanExpired();
         FullSession session = sessions.computeIfAbsent(analysisId,
-                id -> new FullSession(id, AnalysisStatus.COMPLETED, "completed", resumeText, analysis, provider, null));
-        session.complete(resumeText, analysis, provider);
+                id -> new FullSession(id, AnalysisStatus.COMPLETED, "completed", resumeText, analysis, provider, mode, jobDescription, null));
+        session.complete(resumeText, analysis, provider, mode, jobDescription);
+    }
+
+    public void completeSession(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider) {
+        completeSession(analysisId, resumeText, analysis, provider, AnalysisMode.GENERAL, null);
+    }
+
+    public void save(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription) {
+        completeSession(analysisId, resumeText, analysis, provider, mode, jobDescription);
+    }
+
+    public void save(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider) {
+        completeSession(analysisId, resumeText, analysis, provider, AnalysisMode.GENERAL, null);
     }
 
     public void failSession(String analysisId, String safeError) {

@@ -141,6 +141,10 @@ public class ResumeController {
     public SseEmitter analyzeResume(
             @RequestParam(value = "resume", required = false)
             MultipartFile resume,
+            @RequestParam(value = "mode", required = false)
+            String mode,
+            @RequestParam(value = "jobDescription", required = false)
+            String jobDescription,
             HttpServletRequest request,
             HttpServletResponse response
     ) {
@@ -194,8 +198,14 @@ public class ResumeController {
             return emitter;
         }
 
+        final AnalysisMode resolvedMode = AnalysisMode.fromString(mode);
+        final String resolvedJobDesc = (resolvedMode == AnalysisMode.SPECIFIC_JOB
+                && jobDescription != null && !jobDescription.isBlank())
+                ? jobDescription.strip()
+                : null;
+
         try {
-            Future<?> task = analysisExecutor.submit(() -> runAnalysis(resume, emitter, state));
+            Future<?> task = analysisExecutor.submit(() -> runAnalysis(resume, emitter, state, resolvedMode, resolvedJobDesc));
             state.setTask(task);
 
             ScheduledFuture<?> timeout = timeoutScheduler.schedule(
@@ -220,7 +230,7 @@ public class ResumeController {
     }
 
     public SseEmitter analyzeResume(MultipartFile resume, HttpServletRequest request) {
-        return analyzeResume(resume, request, null);
+        return analyzeResume(resume, null, null, request, null);
 
     }
 
@@ -239,6 +249,16 @@ public class ResumeController {
             SseEmitter emitter,
             AnalysisRequestState state
     ) {
+        runAnalysis(resume, emitter, state, AnalysisMode.GENERAL, null);
+    }
+
+    void runAnalysis(
+            MultipartFile resume,
+            SseEmitter emitter,
+            AnalysisRequestState state,
+            AnalysisMode mode,
+            String jobDescription
+    ) {
         MDC.put("analysisId", state.getAnalysisId());
         logger.info("analysis_started analysisId={} uploadBytes={}", state.getAnalysisId(), resume.getSize());
         try {
@@ -255,13 +275,16 @@ public class ResumeController {
             );
 
             state.checkActive();
+            final AnalysisMode effectiveMode = mode != null ? mode : AnalysisMode.GENERAL;
             AIAnalysisResult aiResult = aiProvider.analyzeResumeWithProvider(
                     resumeText,
+                    effectiveMode,
+                    jobDescription,
                     status -> sendStatus(emitter, state, status)
             );
             ResumeAnalysisDTO analysis = aiResult.analysis();
 
-            sessionStore.completeSession(state.getAnalysisId(), resumeText, analysis, aiResult.providerName());
+            sessionStore.completeSession(state.getAnalysisId(), resumeText, analysis, aiResult.providerName(), effectiveMode, jobDescription);
             if (aiResult.providerName() != null && !aiResult.providerName().isBlank()) {
                 sendEvent(emitter, state, "provider", aiResult.providerName());
             }
@@ -479,8 +502,12 @@ public class ResumeController {
             analysisExecutor.submit(() -> {
                 MDC.put("analysisId", analysisId);
                 try {
-                    AIImprovementResult improvementResult = aiProvider.improveResumeWithProvider(finalResumeText, finalAnalysis);
-                    logger.info("improvement_succeeded analysisId={} provider={}", analysisId, improvementResult.providerName());
+                    final String jobDesc = request.jobDescription() != null && !request.jobDescription().isBlank()
+                            ? request.jobDescription().strip()
+                            : (sessionStore.get(analysisId).map(s -> s.jobDescription()).orElse(null));
+                    AIImprovementResult improvementResult = aiProvider.improveResumeWithProvider(finalResumeText, finalAnalysis, jobDesc);
+                    logger.info("improvement_succeeded analysisId={} provider={} mode={}", analysisId, improvementResult.providerName(),
+                            jobDesc != null ? "job_specific" : "general");
                     future.complete(ResponseEntity.ok()
                             .header("X-AI-Provider", improvementResult.providerName())
                             .body(improvementResult.improvement()));

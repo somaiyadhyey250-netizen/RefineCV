@@ -178,6 +178,10 @@ public final class AIResponseParser {
             throw new AnalysisContractValidationException(
                     AnalysisContractValidationException.Reason.SCORE_OUT_OF_RANGE);
         }
+        if (dto.jobMatchScore() != null && (dto.jobMatchScore() < 0 || dto.jobMatchScore() > 100)) {
+            throw new AnalysisContractValidationException(
+                    AnalysisContractValidationException.Reason.SCORE_OUT_OF_RANGE);
+        }
         if (dto.summary().isBlank() || dto.atsCompatibility().isBlank()) {
             throw new AnalysisContractValidationException(
                     AnalysisContractValidationException.Reason.BLANK_REQUIRED_TEXT);

@@ -7,6 +7,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public record ResumeImprovementRequest(
         String analysisId,
         String resumeText,
-        ResumeAnalysisDTO analysis
+        ResumeAnalysisDTO analysis,
+        String jobDescription
 ) {
+    public ResumeImprovementRequest(String analysisId, String resumeText, ResumeAnalysisDTO analysis) {
+        this(analysisId, resumeText, analysis, null);
+    }
 }

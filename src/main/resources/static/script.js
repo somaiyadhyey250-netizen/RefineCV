@@ -1,5 +1,5 @@
 /* =========================================================
-   REFINECV — V2 FRONTEND
+   REFINECV â€” V2 FRONTEND
    ========================================================= */
 
 
@@ -29,6 +29,12 @@ const improvementContainer = document.getElementById("improvementContainer");
 const improvementLoading = document.getElementById("improvementLoading");
 const improvementContent = document.getElementById("improvementContent");
 
+/* V4.2 mode selection */
+const modeCardGeneral = document.getElementById("modeCardGeneral");
+const modeCardJob = document.getElementById("modeCardJob");
+const jobDescriptionWrapper = document.getElementById("jobDescriptionWrapper");
+const jobDescriptionInput = document.getElementById("jobDescriptionInput");
+
 
 /* =========================================================
    STATE
@@ -42,6 +48,10 @@ let isImproving = false;
 let isAnalyzing = false;
 let statusPollingTimer = null;
 const ACTIVE_ANALYSIS_STORAGE_KEY = "refinecv_active_analysis_id";
+
+/* V4.2 mode state */
+let selectedMode = "GENERAL";
+let currentJobDescription = null;
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -133,7 +143,7 @@ function handleFile(file) {
 
 
     selectedFile.textContent =
-        `✓  ${file.name}  ·  ${formatFileSize(file.size)}`;
+        `âœ“  ${file.name}  Â·  ${formatFileSize(file.size)}`;
 
     selectedFile.classList.add("visible");
 
@@ -316,6 +326,50 @@ dropZone.addEventListener("drop", function (event) {
 
 
 /* =========================================================
+   V4.2 MODE SELECTION
+   ========================================================= */
+
+function selectMode(mode) {
+    selectedMode = mode;
+
+    if (modeCardGeneral) {
+        modeCardGeneral.classList.toggle("selected", mode === "GENERAL");
+        modeCardGeneral.setAttribute("aria-pressed", String(mode === "GENERAL"));
+    }
+    if (modeCardJob) {
+        modeCardJob.classList.toggle("selected", mode === "SPECIFIC_JOB");
+        modeCardJob.setAttribute("aria-pressed", String(mode === "SPECIFIC_JOB"));
+    }
+
+    if (jobDescriptionWrapper) {
+        if (mode === "SPECIFIC_JOB") {
+            jobDescriptionWrapper.classList.add("visible");
+            if (jobDescriptionInput) {
+                jobDescriptionInput.setAttribute("aria-required", "true");
+            }
+        } else {
+            jobDescriptionWrapper.classList.remove("visible");
+            if (jobDescriptionInput) {
+                jobDescriptionInput.setAttribute("aria-required", "false");
+            }
+        }
+    }
+}
+
+if (modeCardGeneral) {
+    modeCardGeneral.addEventListener("click", function () {
+        selectMode("GENERAL");
+    });
+}
+
+if (modeCardJob) {
+    modeCardJob.addEventListener("click", function () {
+        selectMode("SPECIFIC_JOB");
+    });
+}
+
+
+/* =========================================================
    ANALYZE BUTTON
    ========================================================= */
 
@@ -332,6 +386,16 @@ analyzeButton.addEventListener(
             return;
         }
 
+        if (selectedMode === "SPECIFIC_JOB") {
+            const jd = jobDescriptionInput ? jobDescriptionInput.value.trim() : "";
+            if (!jd) {
+                showMessage("Please paste a job description before analyzing in Specific Job mode.");
+                if (jobDescriptionInput) {
+                    jobDescriptionInput.focus();
+                }
+                return;
+            }
+        }
 
         startAnalysis(selectedResume);
     }
@@ -390,6 +454,20 @@ async function startAnalysis(file) {
             "resume",
             file
         );
+
+        /* V4.2: include analysis mode and optional job description */
+        formData.append("mode", selectedMode);
+        if (selectedMode === "SPECIFIC_JOB" && jobDescriptionInput) {
+            const jd = jobDescriptionInput.value.trim();
+            if (jd) {
+                currentJobDescription = jd;
+                formData.append("jobDescription", jd);
+            } else {
+                currentJobDescription = null;
+            }
+        } else {
+            currentJobDescription = null;
+        }
 
 
         const response =
@@ -931,6 +1009,52 @@ function renderResults(result) {
         result.summary ||
         "No summary was returned.";
 
+    /* V4.2: job match panel shown only when mode is SPECIFIC_JOB */
+    const isJobMode = result.analysisMode === "SPECIFIC_JOB";
+    const jobMatchScore = Number.isFinite(Number(result.jobMatchScore))
+        ? Number(result.jobMatchScore)
+        : null;
+
+    const jobMatchPanel = isJobMode ? `
+
+        <div class="score-card" style="margin-top: 20px;">
+
+            <div>
+                <div class="result-label">
+                    JOB MATCH
+                </div>
+
+                <div class="score-circle" style="width:90px;height:90px;">
+                    <div class="score-inner">
+                        <div class="score-number" style="font-size:28px;">
+                            ${jobMatchScore !== null ? jobMatchScore : "—"}
+                        </div>
+                        <div class="score-max">
+                            job fit
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="flex:1;">
+                <div class="result-label">
+                    KEYWORD ALIGNMENT
+                </div>
+                <p class="result-summary" style="margin-top:6px;">
+                    ${escapeHTML(result.keywordAlignment || "Not evaluated.")}
+                </p>
+                <div class="result-label" style="margin-top:14px;">
+                    EXPERIENCE ALIGNMENT
+                </div>
+                <p class="result-summary" style="margin-top:6px;">
+                    ${escapeHTML(result.experienceAlignment || "Not evaluated.")}
+                </p>
+            </div>
+
+        </div>
+
+    ` : "";
+
 
     resultsContent.innerHTML = `
 
@@ -981,6 +1105,7 @@ function renderResults(result) {
 
         </div>
 
+        ${jobMatchPanel}
 
         <div class="results-grid">
 
@@ -1185,6 +1310,12 @@ analyzeAgain.addEventListener(
         currentAnalysisId = null;
         currentAnalysisResult = null;
         isImproving = false;
+        currentJobDescription = null;
+        /* V4.2 reset mode to General */
+        selectMode("GENERAL");
+        if (jobDescriptionInput) {
+            jobDescriptionInput.value = "";
+        }
         if (improvementContainer) {
             improvementContainer.hidden = true;
         }
@@ -1358,7 +1489,8 @@ async function requestImprovements() {
     try {
         const payload = {
             analysisId: currentAnalysisId,
-            analysis: currentAnalysisResult
+            analysis: currentAnalysisResult,
+            jobDescription: currentJobDescription || undefined
         };
 
         const response = await fetch("/improve", {
@@ -1439,7 +1571,7 @@ function renderImprovements(data) {
                 </p>
             </div>
             <button type="button" id="copyAllImprovementsBtn" class="copy-all-btn">
-                📋 Copy All Improvements
+                ðŸ“‹ Copy All Improvements
             </button>
         </div>
 
@@ -1450,7 +1582,7 @@ function renderImprovements(data) {
                     <h4>Improved Professional Summary</h4>
                 </div>
                 <button type="button" class="copy-snippet-btn" data-copy="${escapeHTML(summary)}">
-                    📋 Copy Summary
+                    ðŸ“‹ Copy Summary
                 </button>
             </div>
             <p class="improved-summary-text">${escapeHTML(summary)}</p>
@@ -1472,7 +1604,7 @@ function renderImprovements(data) {
                 <div class="bullet-card-header">
                     <span class="bullet-section-tag">${escapeHTML(bullet.section || "Experience")}</span>
                     <button type="button" class="copy-snippet-btn" data-copy="${escapeHTML(bullet.improved)}">
-                        📋 Copy Bullet
+                        ðŸ“‹ Copy Bullet
                     </button>
                 </div>
 
@@ -1489,7 +1621,7 @@ function renderImprovements(data) {
                 </div>
 
                 <div class="bullet-explanation-callout">
-                    <span class="explanation-icon">💡</span>
+                    <span class="explanation-icon">ðŸ’¡</span>
                     <span><strong>Why this works:</strong> ${escapeHTML(bullet.explanation)}</span>
                 </div>
             </div>
@@ -1505,7 +1637,7 @@ function renderImprovements(data) {
                 <span class="card-eyebrow">STRATEGIC ENHANCEMENTS</span>
                 <h4>Key Improvements Applied</h4>
                 <ul class="improvement-check-list">
-                    ${explanations.map(exp => `<li>✓ ${escapeHTML(exp)}</li>`).join("")}
+                    ${explanations.map(exp => `<li>âœ“ ${escapeHTML(exp)}</li>`).join("")}
                 </ul>
             </div>
 
@@ -1513,7 +1645,7 @@ function renderImprovements(data) {
                 <span class="card-eyebrow">ACTIONABLE NEXT STEPS</span>
                 <h4>Recommended Next Steps</h4>
                 <ul class="improvement-action-list">
-                    ${actions.map(act => `<li>→ ${escapeHTML(act)}</li>`).join("")}
+                    ${actions.map(act => `<li>â†’ ${escapeHTML(act)}</li>`).join("")}
                 </ul>
             </div>
         </div>
@@ -1530,7 +1662,7 @@ function attachCopyListeners(data) {
         btn.addEventListener("click", function () {
             const textToCopy = btn.getAttribute("data-copy");
             if (textToCopy) {
-                copyTextToClipboard(textToCopy, btn, "📋 Copy");
+                copyTextToClipboard(textToCopy, btn, "ðŸ“‹ Copy");
             }
         });
     });
@@ -1539,7 +1671,7 @@ function attachCopyListeners(data) {
     if (copyAllBtn) {
         copyAllBtn.addEventListener("click", function () {
             const allText = buildAllImprovementsText(data);
-            copyTextToClipboard(allText, copyAllBtn, "📋 Copy All Improvements");
+            copyTextToClipboard(allText, copyAllBtn, "ðŸ“‹ Copy All Improvements");
         });
     }
 }
@@ -1563,7 +1695,7 @@ function buildAllImprovementsText(data) {
     if (Array.isArray(data.actionableChanges) && data.actionableChanges.length > 0) {
         output += "=== RECOMMENDED ACTIONS ===\n";
         data.actionableChanges.forEach(function (a) {
-            output += "• " + a + "\n";
+            output += "â€¢ " + a + "\n";
         });
     }
 
@@ -1598,7 +1730,7 @@ function copyTextToClipboard(text, btnElement, defaultText) {
 
 function showCopySuccess(btnElement, defaultText) {
     const originalText = btnElement.textContent;
-    btnElement.textContent = "✓ Copied!";
+    btnElement.textContent = "âœ“ Copied!";
     btnElement.classList.add("copied");
     setTimeout(function () {
         btnElement.textContent = originalText;

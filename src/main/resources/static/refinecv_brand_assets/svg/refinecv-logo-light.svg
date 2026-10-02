@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 260" role="img" aria-label="RefineCV — Resume Intelligence">
+<defs>
+    <linearGradient id="brandGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0EA5FF"/>
+      <stop offset="55%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+    </defs>
+<rect width="980" height="260" fill="none"/>
+<g transform="translate(0,18) scale(.44)">
+
+
+<path d="M128 96h168l64 64v224H128V96Z" fill="none" stroke="url(#brandGradient)" stroke-width="28" stroke-linejoin="round"/>
+<path d="M296 96v64h64" fill="none" stroke="url(#brandGradient)" stroke-width="28" stroke-linejoin="round"/>
+<path d="M172 184h116M172 226h104M172 268h88" fill="none" stroke="#22D3EE" stroke-width="18" stroke-linecap="round"/>
+<path d="M150 374c76-6 142-32 176-78 18-25 23-54 13-76-12-27-42-39-75-31-35 8-63 33-68 61-4 22 7 41 31 49 24 8 55 1 82-19"
+      fill="none" stroke="url(#brandGradient)" stroke-width="31" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M316 255c14 10 24 24 28 40" fill="none" stroke="url(#brandGradient)" stroke-width="31" stroke-linecap="round"/>
+<path d="M386 108l8 22 22 8-22 8-8 22-8-22-22-8 22-8 8-22Z" fill="#8B5CF6"/>
+
+</g>
+<text x="205" y="133" font-family="Inter, Plus Jakarta Sans, Arial, sans-serif" font-size="82" font-weight="750" letter-spacing="-2" fill="#081220">Refine</text>
+<text x="500" y="133" font-family="Inter, Plus Jakarta Sans, Arial, sans-serif" font-size="82" font-weight="750" letter-spacing="-2" fill="url(#brandGradient)">CV</text>
+<text x="209" y="177" font-family="Inter, Plus Jakarta Sans, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="6" fill="#081220" opacity=".72">RESUME INTELLIGENCE</text>
+</svg>

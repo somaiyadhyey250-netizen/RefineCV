@@ -34,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.ui.Model;
 
 @Controller
 public class ResumeController {
@@ -123,14 +124,89 @@ public class ResumeController {
 
 
     /* =========================================
-       HOME PAGE
+       PRODUCT PAGES
     ========================================= */
 
     @GetMapping("/")
     public String home() {
-
         return "index";
+    }
 
+    @GetMapping("/analyze")
+    public String analyzePage() {
+        return "analyze";
+    }
+
+    @GetMapping("/analysis/{analysisId}")
+    public String generalAnalysisPage(@PathVariable("analysisId") String analysisId, Model model) {
+        model.addAttribute("analysisId", analysisId);
+        model.addAttribute("mode", "GENERAL");
+        sessionStore.get(analysisId).ifPresent(s -> {
+            model.addAttribute("sessionData", s);
+            model.addAttribute("analysisResult", s.analysis());
+        });
+        return "analysis";
+    }
+
+    @GetMapping("/job-analysis/{analysisId}")
+    public String jobAnalysisPage(@PathVariable("analysisId") String analysisId, Model model) {
+        model.addAttribute("analysisId", analysisId);
+        model.addAttribute("mode", "SPECIFIC_JOB");
+        sessionStore.get(analysisId).ifPresent(s -> {
+            model.addAttribute("sessionData", s);
+            model.addAttribute("analysisResult", s.analysis());
+            model.addAttribute("jobDescription", s.jobDescription());
+        });
+        return "job-analysis";
+    }
+
+    @GetMapping("/improve/{analysisId}")
+    public String improvePage(@PathVariable("analysisId") String analysisId, Model model) {
+        model.addAttribute("analysisId", analysisId);
+        String resolvedMode = "GENERAL";
+        var sessionOpt = sessionStore.get(analysisId);
+        if (sessionOpt.isPresent()) {
+            var s = sessionOpt.get();
+            model.addAttribute("sessionData", s);
+            model.addAttribute("analysisResult", s.analysis());
+            model.addAttribute("jobDescription", s.jobDescription());
+            if (s.mode() != null) {
+                resolvedMode = s.mode().name();
+            }
+        }
+        model.addAttribute("mode", resolvedMode);
+        sessionStore.getImprovement(analysisId).ifPresent(imp -> {
+            model.addAttribute("improvementResult", imp);
+        });
+        return "improve";
+    }
+
+    @GetMapping("/resume/{analysisId}")
+    public String resumeWorkspacePage(@PathVariable("analysisId") String analysisId, Model model) {
+        model.addAttribute("analysisId", analysisId);
+        String resolvedMode = "GENERAL";
+        var sessionOpt = sessionStore.get(analysisId);
+        if (sessionOpt.isPresent()) {
+            var s = sessionOpt.get();
+            model.addAttribute("sessionData", s);
+            model.addAttribute("resumeText", s.resumeText());
+            if (s.mode() != null) {
+                resolvedMode = s.mode().name();
+            }
+        }
+        model.addAttribute("mode", resolvedMode);
+        return "resume";
+    }
+
+    @GetMapping("/history")
+    public String historyPage() {
+        return "history";
+    }
+
+    @GetMapping(value = "/api/history", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public java.util.List<HistoryItemDTO> getHistoryApi() {
+        return sessionStore.getRecentCompletedSessions();
     }
 
 
@@ -488,18 +564,31 @@ public class ResumeController {
             @RequestBody(required = false) ResumeImprovementRequest request,
             HttpServletRequest httpRequest
     ) {
+        if (request == null) {
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("error", "Invalid improvement request."))
+            );
+        }
+
+        // 1. If an improvement has already been generated for this analysis session, return it immediately without rate-limiting.
+        final String requestedAnalysisId = request.analysisId() != null && !request.analysisId().isBlank() ? request.analysisId() : "direct";
+        var cachedImprovement = sessionStore.getImprovement(requestedAnalysisId);
+        if (cachedImprovement.isPresent()) {
+            logger.info("improvement_cache_hit analysisId={}", requestedAnalysisId);
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.ok()
+                            .header("X-AI-Provider", "cached")
+                            .body(cachedImprovement.get())
+            );
+        }
+
+        // 2. Only rate limit fresh AI generation calls
         if (!rateLimiter.tryAcquire(httpRequest.getRemoteAddr())) {
             logger.warn("improvement_request_rejected category={}", AnalysisErrorMessages.Category.RATE_LIMITED);
             return CompletableFuture.completedFuture(
                     ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                             .body(Map.of("error", AnalysisErrorMessages.forImprovementCategory(AnalysisErrorMessages.Category.RATE_LIMITED)))
-            );
-        }
-
-        if (request == null) {
-            return CompletableFuture.completedFuture(
-                    ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(Map.of("error", "Invalid improvement request."))
             );
         }
 
@@ -529,7 +618,7 @@ public class ResumeController {
 
         final String finalResumeText = resumeText;
         final ResumeAnalysisDTO finalAnalysis = analysis;
-        final String analysisId = request.analysisId() != null ? request.analysisId() : "direct";
+        final String analysisId = requestedAnalysisId;
 
         logger.info("improvement_started analysisId={}", analysisId);
 
@@ -543,6 +632,7 @@ public class ResumeController {
                             ? request.jobDescription().strip()
                             : (sessionStore.get(analysisId).map(s -> s.jobDescription()).orElse(null));
                     AIImprovementResult improvementResult = aiProvider.improveResumeWithProvider(finalResumeText, finalAnalysis, jobDesc);
+                    sessionStore.saveImprovement(analysisId, improvementResult.improvement());
                     logger.info("improvement_succeeded analysisId={} provider={} mode={}", analysisId, improvementResult.providerName(),
                             jobDesc != null ? "job_specific" : "general");
                     future.complete(ResponseEntity.ok()

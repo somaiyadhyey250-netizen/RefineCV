@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Match Review | RefineCV</title>
+  <meta name="description" content="Specific Job Match Analysis comparing your resume against targeted job description context.">
+
+  <link rel="icon" type="image/svg+xml" href="/refinecv_brand_assets/svg/refinecv-favicon.svg">
+  <link rel="icon" href="/refinecv_brand_assets/favicon/favicon.ico" sizes="any">
+
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('refinecv-theme');
+        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (dark ? 'dark' : 'light'));
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body th:attr="data-analysis-id=${analysisId}">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="/" aria-label="RefineCV home">
+        <span class="brand-word">Refine<span class="brand-cv">CV</span></span>
+      </a>
+
+      <div class="header-right">
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/">Home</a>
+          <a href="/analyze">Analyze</a>
+          <a href="/history">History</a>
+        </nav>
+
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch theme">
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+
+        <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileNav">
+          <svg class="icon-menu" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <svg class="icon-close" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Drawer -->
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation" hidden>
+      <div class="wrap mobile-nav-inner">
+        <a href="/" class="mobile-nav-link">Home</a>
+        <a href="/#what-you-get" class="mobile-nav-link">What you get</a>
+        <a href="/#how-it-works" class="mobile-nav-link">How it works</a>
+        <a href="/history" class="mobile-nav-link">History</a>
+        <a href="/analyze" class="mobile-nav-link mobile-nav-cta">Analyze Resume &rarr;</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main" class="report-main">
+    <div class="report-wrap">
+      <!-- Report Top Bar -->
+      <div class="report-topbar">
+        <div class="report-topbar-left">
+          <a href="/analyze" class="btn btn-quiet btn-sm nav-back-btn" id="resultBackBtn">← Back</a>
+          <span class="report-file-badge" id="reportFileName">Job Match Review</span>
+          <span class="report-status-badge">Evaluation Complete</span>
+        </div>
+        <div class="report-topbar-actions">
+          <a href="/analyze" class="btn btn-quiet btn-sm">Analyze Another Resume</a>
+          <button class="btn btn-quiet btn-sm" type="button" id="printBtn">Save as PDF</button>
+          <a th:href="@{'/improve/' + ${analysisId}}" class="btn btn-primary btn-sm" data-action="improve">Improve Resume &rarr;</a>
+        </div>
+      </div>
+
+      <!-- 1. Hero Card: Score, Role & Alignments -->
+      <section class="report-card card-hero" id="r-job-fit">
+        <div class="hero-header-row">
+          <div>
+            <span class="hero-eyebrow">Job Match Analysis</span>
+            <h1 class="hero-title" id="resultsTitle">Your resume, matched.</h1>
+          </div>
+          <div class="job-context-pill">
+            <span>Target Role:</span>
+            <strong id="jobRoleTitle">Evaluating...</strong>
+          </div>
+        </div>
+
+        <div class="score-block">
+          <div class="score-num"><span id="scoreNum">0</span><small>Job Match %</small></div>
+          <div class="score-side">
+            <p class="score-label" id="scoreLabel">Target Alignment</p>
+            <div class="ruler" aria-hidden="true">
+              <span class="ruler-fill" id="rulerFill"></span>
+              <span class="ruler-pin" id="rulerPin"></span>
+              <span class="t t0">0%</span>
+              <span class="t t50">50%</span>
+              <span class="t t70">70%</span>
+              <span class="t t85">85%</span>
+              <span class="t t100">100%</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="summary" id="summary"></p>
+
+        <div class="ats-card-row">
+          <div class="ats-metric">
+            <span class="metric-label">Target Context</span>
+            <span class="metric-val" id="targetContextPill">Target Job</span>
+          </div>
+          <div class="ats-metric">
+            <span class="metric-label">Keyword Alignment</span>
+            <span class="metric-val" id="keywordAlignment">-</span>
+          </div>
+          <div class="ats-metric">
+            <span class="metric-label">Experience Alignment</span>
+            <span class="metric-val" id="experienceAlignment">-</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Skills Alignment Cards: Matching vs Missing Skills -->
+      <div class="card-grid-2" id="r-skills">
+        <section class="report-card">
+          <div class="card-header">
+            <h2 class="card-title">Matching Skills</h2>
+            <span class="card-badge badge-success">Aligned</span>
+          </div>
+          <p class="card-desc">Competencies verified in your resume matching the target position.</p>
+          <ul class="chips chips-strong" id="listMatchingSkills"></ul>
+        </section>
+
+        <section class="report-card">
+          <div class="card-header">
+            <h2 class="card-title">Missing Skills / Gaps</h2>
+            <span class="card-badge badge-warning">Target Gap</span>
+          </div>
+          <p class="card-desc">Required or preferred skills missing from your resume for this role.</p>
+          <ul class="chips chips-gap" id="listMissingSkills"></ul>
+        </section>
+      </div>
+
+      <!-- 3. Role-Specific Strengths & Weaknesses Cards -->
+      <div class="card-grid-2" id="r-review">
+        <section class="report-card">
+          <div class="card-header">
+            <h2 class="card-title">Role-Specific Strengths</h2>
+            <span class="card-badge badge-success">High Impact</span>
+          </div>
+          <p class="card-desc">Experience and accomplishments giving you a competitive edge.</p>
+          <ul class="marks marks-plus" id="listStrengths"></ul>
+        </section>
+
+        <section class="report-card">
+          <div class="card-header">
+            <h2 class="card-title">Gaps Holding You Back</h2>
+            <span class="card-badge badge-warning">Address These</span>
+          </div>
+          <p class="card-desc">Areas where your resume does not yet fulfill the role requirements.</p>
+          <ul class="marks marks-minus" id="listWeaknesses"></ul>
+        </section>
+      </div>
+
+      <!-- 4. Role-Specific Recommendations (Full Width) -->
+      <section class="report-card" id="r-suggestions">
+        <div class="card-header">
+          <h2 class="card-title">Role-Specific Recommendations</h2>
+          <span class="card-badge">Actionable</span>
+        </div>
+        <p class="card-desc">Targeted strategic steps to elevate your alignment with this position.</p>
+        <ul class="plain" id="listSuggestions"></ul>
+      </section>
+
+      <!-- 5. Bottom Action Bar -->
+      <div class="report-bottom-bar">
+        <div class="bottom-bar-left">
+          <a href="/analyze" class="btn btn-quiet" id="bottomBackBtn">← Back</a>
+          <a href="/analyze" class="btn btn-quiet">Analyze Another Resume</a>
+          <button class="btn btn-quiet" type="button" onclick="window.print()">Save as PDF</button>
+        </div>
+        <div class="bottom-bar-right">
+          <a th:href="@{'/improve/' + ${analysisId}}" class="btn btn-primary" data-action="improve">Improve Resume &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-row">
+      <div class="foot-brand">
+        <div class="foot-brand-text">
+          <div class="foot-brand-title">Refine<span class="brand-cv foot-cv">CV</span></div>
+          <span class="foot-subtitle">resume intelligence</span>
+        </div>
+      </div>
+      <span class="foot-creator">
+        <span>Built by <a href="https://somaiyadhyey250-netizen.github.io/WebTechnology_P5/" target="_blank" rel="noopener">Dhyey Somaiya</a></span>
+        <span class="foot-upgrow" aria-hidden="true"><svg class="upgrow-mark" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 11.5L6.5 7.5L9.5 10.5L14 5M14 5H10.5M14 5V8.5"/></svg></span>
+      </span>
+    </div>
+  </footer>
+
+  <!-- Scroll to Top Button -->
+  <button class="scroll-top" id="scrollTopBtn" type="button" aria-label="Scroll to top" title="Scroll to top">↑</button>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/job-report.js"></script>
+</body>
+</html>

@@ -40,6 +40,7 @@ public class AnalysisSessionStore {
         private volatile AnalysisMode mode;
         private volatile String jobDescription;
         private volatile String error;
+        private volatile ResumeImprovementDTO improvement;
         private final Instant createdAt;
         private volatile Instant updatedAt;
 
@@ -73,6 +74,11 @@ public class AnalysisSessionStore {
         public AnalysisMode getMode() { return mode; }
         public String getJobDescription() { return jobDescription; }
         public String getError() { return error; }
+        public ResumeImprovementDTO getImprovement() { return improvement; }
+        public void setImprovement(ResumeImprovementDTO improvement) {
+            this.improvement = improvement;
+            this.updatedAt = Instant.now();
+        }
         public Instant getCreatedAt() { return createdAt; }
         public Instant getUpdatedAt() { return updatedAt; }
 
@@ -221,6 +227,41 @@ public class AnalysisSessionStore {
             return Optional.empty();
         }
         return Optional.of(session);
+    }
+
+    public Optional<ResumeImprovementDTO> getImprovement(String analysisId) {
+        if (analysisId == null || analysisId.isBlank()) return Optional.empty();
+        FullSession session = sessions.get(analysisId);
+        if (session == null || session.getImprovement() == null) return Optional.empty();
+        if (Duration.between(session.getCreatedAt(), Instant.now()).toMillis() > ttlMillis) {
+            sessions.remove(analysisId);
+            return Optional.empty();
+        }
+        return Optional.of(session.getImprovement());
+    }
+
+    public void saveImprovement(String analysisId, ResumeImprovementDTO improvement) {
+        if (analysisId == null || analysisId.isBlank() || improvement == null) return;
+        FullSession session = sessions.get(analysisId);
+        if (session != null) {
+            session.setImprovement(improvement);
+        }
+    }
+
+    public java.util.List<HistoryItemDTO> getRecentCompletedSessions() {
+        cleanExpired();
+        return sessions.values().stream()
+                .filter(s -> s.getStatus() == AnalysisStatus.COMPLETED && s.getAnalysis() != null)
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .limit(20)
+                .map(s -> new HistoryItemDTO(
+                        s.getAnalysisId(),
+                        s.getMode() != null ? s.getMode().name() : "GENERAL",
+                        "Resume.pdf",
+                        s.getAnalysis() != null ? s.getAnalysis().score() : 0,
+                        s.getCreatedAt().toString()
+                ))
+                .toList();
     }
 
     public void clear() {

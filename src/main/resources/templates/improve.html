@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resume Improvement Workspace | RefineCV</title>
+  <meta name="description" content="AI-guided resume refinement workspace with side-by-side bullet makeovers and professional summary edits.">
+
+  <link rel="icon" type="image/svg+xml" href="/refinecv_brand_assets/svg/refinecv-favicon.svg">
+  <link rel="icon" href="/refinecv_brand_assets/favicon/favicon.ico" sizes="any">
+
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('refinecv-theme');
+        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (dark ? 'dark' : 'light'));
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body th:attr="data-analysis-id=${analysisId},data-analysis-mode=${mode}">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="/" aria-label="RefineCV home">
+        <span class="brand-word">Refine<span class="brand-cv">CV</span></span>
+      </a>
+
+      <div class="header-right">
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/analyze" class="nav-link">Analyze</a>
+          <a href="/history" class="nav-link">History</a>
+        </nav>
+
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch theme">
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+
+        <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileNav">
+          <svg class="icon-menu" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <svg class="icon-close" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Drawer -->
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation" hidden>
+      <div class="wrap mobile-nav-inner">
+        <a href="/" class="mobile-nav-link">Home</a>
+        <a href="/#what-you-get" class="mobile-nav-link">What you get</a>
+        <a href="/#how-it-works" class="mobile-nav-link">How it works</a>
+        <a href="/history" class="mobile-nav-link">History</a>
+        <a href="/analyze" class="mobile-nav-link mobile-nav-cta">Analyze Resume &rarr;</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="wrap" style="padding-top: 24px; padding-bottom: 0;">
+      <!-- Breadcrumb Navigation -->
+      <nav class="page-nav-back" aria-label="Breadcrumb">
+        <a th:href="${mode == 'SPECIFIC_JOB' ? '/job-analysis/' + analysisId : '/analysis/' + analysisId}" class="nav-back-link" id="topBackToAnalysisLink">← Back to Analysis</a>
+      </nav>
+    </div>
+
+    <div class="wrap report" style="padding-top: 0;">
+      <!-- Left Rail Navigation -->
+      <aside class="rail" aria-label="Refinement actions">
+        <p class="rail-file">Refinement Workspace</p>
+        <div class="rail-actions" style="margin-top: 0;">
+          <button class="btn btn-primary btn-sm" type="button" id="copyAllBtn">Copy all improvements</button>
+          <a th:href="${mode == 'SPECIFIC_JOB' ? '/job-analysis/' + analysisId : '/analysis/' + analysisId}" class="btn btn-quiet btn-sm" id="backToReportBtn">← Back to Analysis</a>
+          <a href="/analyze" class="btn btn-quiet btn-sm">Analyze Another Resume</a>
+        </div>
+      </aside>
+
+      <!-- Main Document Paper Sheet -->
+      <article class="doc">
+        <!-- Loading State -->
+        <div id="loadingState" class="loading" style="padding-top: 32px; padding-bottom: 32px;" hidden>
+          <div class="loading-head">
+            <h1 class="h-md">Crafting resume enhancements</h1>
+            <p class="lede">Analyzing bullet points and generating metric-focused active phrasing without inventing facts.</p>
+          </div>
+          <div class="progress" style="margin-top: 24px;"><span style="width: 70%; animation: pulse 1.5s infinite;"></span></div>
+          <p class="hint">This usually takes 10 to 20 seconds.</p>
+        </div>
+
+        <!-- Content State -->
+        <div id="contentState">
+          <header class="refine-header">
+            <h1 class="h-md">Refined Resume Enhancements</h1>
+            <p class="lede" style="margin: 10px 0 0;">Action-oriented, fact-grounded rewrites derived strictly from your uploaded resume.</p>
+            <p class="refine-note">Review AI-generated changes for accuracy before incorporating them into your official resume.</p>
+          </header>
+
+          <!-- Improved Summary -->
+          <section class="sec" style="padding-top: 0;">
+            <div class="summary-box">
+              <div class="summary-box-head">
+                <h2 class="h-sm" style="margin: 0;">Improved Professional Summary</h2>
+                <button type="button" class="btn btn-quiet btn-sm" id="copySummaryBtn">Copy summary</button>
+              </div>
+              <p class="summary-text" id="summaryText"></p>
+            </div>
+          </section>
+
+          <!-- Bullet Point Makeovers -->
+          <section class="sec">
+            <h2 class="h-sm">Bullet Point Makeovers</h2>
+            <p class="hint" style="margin-bottom: 20px;">Comparing original bullets against high-impact, metric-focused active phrasing.</p>
+            <div id="makeoversList"></div>
+          </section>
+
+          <!-- Actionable Changes -->
+          <section class="sec">
+            <h2 class="h-sm">Actionable Changes</h2>
+            <ul class="plain" id="actionsList"></ul>
+          </section>
+
+          <footer class="doc-foot">
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('copyAllBtn').click()">Copy all improvements</button>
+            <a th:href="${mode == 'SPECIFIC_JOB' ? '/job-analysis/' + analysisId : '/analysis/' + analysisId}" class="btn btn-quiet" id="bottomBackToReportBtn">← Back to Analysis</a>
+            <a href="/analyze" class="btn btn-quiet">Analyze Another Resume</a>
+          </footer>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-row">
+      <div class="foot-brand">
+        <div class="foot-brand-text">
+          <div class="foot-brand-title">Refine<span class="brand-cv foot-cv">CV</span></div>
+          <span class="foot-subtitle">resume intelligence</span>
+        </div>
+      </div>
+      <span class="foot-creator">
+        <span>Built by <a href="https://somaiyadhyey250-netizen.github.io/WebTechnology_P5/" target="_blank" rel="noopener">Dhyey Somaiya</a></span>
+        <span class="foot-upgrow" aria-hidden="true"><svg class="upgrow-mark" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 11.5L6.5 7.5L9.5 10.5L14 5M14 5H10.5M14 5V8.5"/></svg></span>
+      </span>
+    </div>
+  </footer>
+
+  <!-- Scroll to Top Button -->
+  <button class="scroll-top" id="scrollTopBtn" type="button" aria-label="Scroll to top" title="Scroll to top">↑</button>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/improve.js"></script>
+</body>
+</html>

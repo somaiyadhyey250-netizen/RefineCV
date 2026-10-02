@@ -245,9 +245,14 @@ public class GroqAIProvider implements AIProvider {
                 String clean = AIResponseParser.cleanJson(failedGeneration);
                 if (clean.startsWith("{") && clean.endsWith("}")) {
                     try {
-                        objectMapper.readTree(clean);
-                        logger.info("provider=groq operation={} recovered_from=failed_generation durationMs={}", operation, duration);
-                        return clean;
+                        JsonNode parsedTree = objectMapper.readTree(clean);
+                        boolean isValidGeneral = parsedTree.has("score") && parsedTree.has("summary") && parsedTree.has("strongestSkills");
+                        boolean isValidImprovement = parsedTree.has("improvedSummary") && parsedTree.has("bulletImprovements");
+                        boolean isValidJobMatch = parsedTree.has("jobMatchScore") && parsedTree.has("matchingSkills") && parsedTree.has("experienceAlignment");
+                        if (parsedTree.isObject() && (isValidGeneral || isValidImprovement || isValidJobMatch)) {
+                            logger.info("provider=groq operation={} recovered_from=failed_generation durationMs={}", operation, duration);
+                            return clean;
+                        }
                     } catch (Exception ignored) {}
                 }
             }

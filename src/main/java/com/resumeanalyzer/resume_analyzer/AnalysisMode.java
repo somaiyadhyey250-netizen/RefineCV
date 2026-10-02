@@ -17,6 +17,6 @@ public enum AnalysisMode {
                 return mode;
             }
         }
-        throw new IllegalArgumentException("Invalid analysis mode: " + value);
+        throw new ResumeValidationException(ResumeValidationException.Reason.INVALID_MODE);
     }
 }

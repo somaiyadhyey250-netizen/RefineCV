@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -6,10 +6,10 @@
 
     <meta
         name="description"
-        content="RefineCV â€” AI-powered resume intelligence that helps you understand, improve and strengthen your resume."
+        content="RefineCV &mdash; AI-powered resume intelligence that helps you understand, improve and strengthen your resume."
     >
 
-    <title>RefineCV â€” Resume Intelligence</title>
+    <title>RefineCV &mdash; Resume Intelligence</title>
 
     <link rel="stylesheet" href="/style.css">
 </head>
@@ -59,9 +59,9 @@
 
         <div class="hero-meta">
             <span>PDF analysis</span>
-            <span class="meta-separator">â€¢</span>
+            <span class="meta-separator">&bull;</span>
             <span>OCR support</span>
-            <span class="meta-separator">â€¢</span>
+            <span class="meta-separator">&bull;</span>
             <span>AI insights</span>
         </div>
 
@@ -75,7 +75,7 @@
         <div class="card-top">
 
             <div class="upload-symbol">
-                â†‘
+                &#8593;
             </div>
 
             <div class="card-kicker">
@@ -105,8 +105,8 @@
                 <button
                     type="button"
                     id="modeCardGeneral"
-                    class="mode-card selected"
-                    aria-pressed="true"
+                    class="mode-card"
+                    aria-pressed="false"
                     data-mode="GENERAL"
                 >
                     <div class="mode-card-check" aria-hidden="true">&#10003;</div>
@@ -152,6 +152,24 @@
         </div>
 
 
+        <!-- Continue button: enabled only after a mode is selected -->
+
+        <button
+            type="button"
+            id="continueButton"
+            class="continue-button"
+            disabled
+            aria-label="Continue to upload resume"
+        >
+            <span>Continue</span>
+            <span class="button-arrow" aria-hidden="true">&#8594;</span>
+        </button>
+
+
+        <!-- Upload section: hidden until Continue is clicked -->
+
+        <div id="uploadSection" class="upload-section" hidden>
+
         <!-- IMPORTANT:
              The whole drop-zone is clickable.
              JS explicitly opens #resumeFile.
@@ -172,7 +190,7 @@
             >
 
             <div class="drop-zone-icon">
-                â†‘
+                &#8593;
             </div>
 
             <div class="drop-zone-content">
@@ -188,7 +206,7 @@
             </div>
 
             <div class="drop-zone-arrow">
-                â†’
+                &#8594;
             </div>
 
         </div>
@@ -196,7 +214,7 @@
 
         <div class="file-info">
             <span>PDF only</span>
-            <span>â€¢</span>
+            <span>&bull;</span>
             <span>Maximum 5 MB</span>
         </div>
 
@@ -219,13 +237,24 @@
             disabled
         >
             <span>Analyze Resume</span>
-            <span class="button-arrow">â†’</span>
+            <span class="button-arrow">&#8594;</span>
+        </button>
+
+        <button
+            type="button"
+            id="resetButton"
+            class="reset-button"
+            aria-label="Reset selection and return to mode selection"
+        >
+            <span>Reset</span>
         </button>
 
         <p class="privacy-notice">
             RefineCV processes your uploaded resume. Extracted content is sent to the configured Google Gemini API for AI analysis.
             Please avoid uploading information you do not want processed by the AI provider.
         </p>
+
+        </div><!-- /.upload-section -->
 
     </div>
 
@@ -469,7 +498,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">âœ“</span>
+                    <span class="step-check">&#10003;</span>
                 </div>
 
                 <span class="step-number-small">
@@ -491,7 +520,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">âœ“</span>
+                    <span class="step-check">&#10003;</span>
                 </div>
 
                 <span class="step-number-small">
@@ -513,7 +542,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">âœ“</span>
+                    <span class="step-check">&#10003;</span>
                 </div>
 
                 <span class="step-number-small">
@@ -535,7 +564,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">âœ“</span>
+                    <span class="step-check">&#10003;</span>
                 </div>
 
                 <span class="step-number-small">
@@ -557,7 +586,7 @@
 
                 <div class="step-status">
                     <span class="step-spinner"></span>
-                    <span class="step-check">âœ“</span>
+                    <span class="step-check">&#10003;</span>
                 </div>
 
                 <span class="step-number-small">
@@ -603,29 +632,8 @@
 
                 <h2>
                     Your resume,
-                    <span>refined.</span>
+                    <span id="resultsHeroAccent">refined.</span>
                 </h2>
-            </div>
-
-            <div class="results-actions">
-                <button
-                    type="button"
-                    id="improveResumeButton"
-                    class="improve-resume-btn"
-                >
-                    <span class="btn-sparkle">âœ¨</span>
-                    Improve My Resume
-                    <span class="btn-arrow">â†’</span>
-                </button>
-
-                <button
-                type="button"
-                id="analyzeAgain"
-                class="analyze-again"
-            >
-                Analyze Another Resume
-                <span>â†’</span>
-            </button>
             </div>
 
         </div>
@@ -644,6 +652,31 @@
             </div>
 
             <div id="improvementContent" class="improvement-content" hidden></div>
+        </div>
+
+        <!-- Contextual action at the bottom of results / improvements -->
+        <div class="results-bottom-action" id="resultsBottomAction">
+            <p class="results-bottom-prompt" id="resultsBottomPrompt">Ready to take the next step?</p>
+            <div class="results-bottom-buttons">
+                <button
+                    type="button"
+                    id="improveResumeButton"
+                    class="improve-resume-btn"
+                >
+                    <span class="btn-sparkle">&#10024;</span>
+                    Improve My Resume
+                    <span class="btn-arrow">&#8594;</span>
+                </button>
+
+                <button
+                    type="button"
+                    id="analyzeAgain"
+                    class="analyze-again"
+                >
+                    Analyze Another Resume
+                    <span>&#8594;</span>
+                </button>
+            </div>
         </div>
 
     </div>
@@ -683,7 +716,7 @@
     <div class="footer-bottom">
 
         <p>
-            Â© 2026 RefineCV
+            &copy; 2026 RefineCV
         </p>
 
         <p>
@@ -693,7 +726,7 @@
                 target="_blank"
                 rel="noopener noreferrer"
             >
-                Dhyey Somaiya â†—
+                Dhyey Somaiya &#8599;
             </a>
         </p>
 

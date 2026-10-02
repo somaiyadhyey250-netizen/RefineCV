@@ -40,6 +40,11 @@ public class ResumeController {
 
     private static final Logger logger = LoggerFactory.getLogger(ResumeController.class);
 
+    /** Maximum number of characters accepted in a job description (matches frontend maxlength). */
+    static final int JD_MAX_LENGTH = 8000;
+
+
+
 
     private final ResumeTextExtractor resumeTextExtractor;
 
@@ -198,31 +203,38 @@ public class ResumeController {
             return emitter;
         }
 
-        final AnalysisMode resolvedMode = AnalysisMode.fromString(mode);
-        final String resolvedJobDesc = (resolvedMode == AnalysisMode.SPECIFIC_JOB
-                && jobDescription != null && !jobDescription.isBlank())
-                ? jobDescription.strip()
-                : null;
-
         try {
-            Future<?> task = analysisExecutor.submit(() -> runAnalysis(resume, emitter, state, resolvedMode, resolvedJobDesc));
-            state.setTask(task);
+            final AnalysisMode resolvedMode = AnalysisMode.fromString(mode);
+            validateModeAndJobDescription(resolvedMode, jobDescription);
 
-            ScheduledFuture<?> timeout = timeoutScheduler.schedule(
-                    () -> handleTimeout(emitter, state),
-                    Instant.now().plus(analysisTimeout)
-            );
-            if (timeout != null) {
-                state.setTimeout(timeout);
+            final String resolvedJobDesc = (resolvedMode == AnalysisMode.SPECIFIC_JOB)
+                    ? jobDescription.strip()
+                    : null;
+
+            try {
+                Future<?> task = analysisExecutor.submit(() -> runAnalysis(resume, emitter, state, resolvedMode, resolvedJobDesc));
+                state.setTask(task);
+
+                ScheduledFuture<?> timeout = timeoutScheduler.schedule(
+                        () -> handleTimeout(emitter, state),
+                        Instant.now().plus(analysisTimeout)
+                );
+                if (timeout != null) {
+                    state.setTimeout(timeout);
+                }
+            } catch (RejectedExecutionException e) {
+                logger.warn("analysis_request_rejected analysisId={} category={} errorType={}",
+                        state.getAnalysisId(), AnalysisErrorMessages.Category.BUSY, e.getClass().getName());
+                finishError(emitter, state, AnalysisErrorMessages.forException(e));
+            } catch (RuntimeException e) {
+                logger.error("analysis_start_failed analysisId={} errorType={}",
+                        state.getAnalysisId(), e.getClass().getName());
+                state.cancel();
+                finishError(emitter, state, AnalysisErrorMessages.forException(e));
             }
-        } catch (RejectedExecutionException e) {
-            logger.warn("analysis_request_rejected analysisId={} category={} errorType={}",
-                    state.getAnalysisId(), AnalysisErrorMessages.Category.BUSY, e.getClass().getName());
-            finishError(emitter, state, AnalysisErrorMessages.forException(e));
-        } catch (RuntimeException e) {
-            logger.error("analysis_start_failed analysisId={} errorType={}",
-                    state.getAnalysisId(), e.getClass().getName());
-            state.cancel();
+        } catch (ResumeValidationException e) {
+            logger.warn("analysis_request_rejected analysisId={} category={} reason={}",
+                    state.getAnalysisId(), AnalysisErrorMessages.classify(e), e.getReason());
             finishError(emitter, state, AnalysisErrorMessages.forException(e));
         }
 
@@ -241,6 +253,31 @@ public class ResumeController {
 
         if (resume.getSize() > maxUploadBytes) {
             throw new ResumeValidationException(ResumeValidationException.Reason.FILE_TOO_LARGE);
+        }
+    }
+
+    /**
+     * Validates the analysis mode and job description.
+     * SPECIFIC_JOB requires a non-null, non-blank, and bounded-length job description.
+     * GENERAL allows null or blank JD.
+     */
+    void validateModeAndJobDescription(AnalysisMode mode, String jobDescription) {
+        if (mode == AnalysisMode.SPECIFIC_JOB) {
+            if (jobDescription == null || jobDescription.isBlank()) {
+                throw new ResumeValidationException(ResumeValidationException.Reason.MISSING_JOB_DESCRIPTION);
+            }
+            String stripped = jobDescription.strip();
+            if (stripped.length() > JD_MAX_LENGTH) {
+                throw new ResumeValidationException(ResumeValidationException.Reason.JOB_DESCRIPTION_TOO_LONG);
+            }
+            if (!JobDescriptionValidator.isValid(stripped)) {
+                throw new ResumeValidationException(ResumeValidationException.Reason.INSUFFICIENT_JOB_DESCRIPTION);
+            }
+        } else if (mode == AnalysisMode.GENERAL) {
+            // JD is ignored for GENERAL; no validation required.
+            if (jobDescription != null && jobDescription.strip().length() > JD_MAX_LENGTH) {
+                throw new ResumeValidationException(ResumeValidationException.Reason.JOB_DESCRIPTION_TOO_LONG);
+            }
         }
     }
 

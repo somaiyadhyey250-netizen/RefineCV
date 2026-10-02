@@ -11,7 +11,11 @@ public class ResumeValidationException extends RuntimeException {
         TOO_MANY_PAGES,
         PAGE_DIMENSIONS_TOO_LARGE,
         NO_READABLE_TEXT,
-        TEXT_TOO_LARGE
+        TEXT_TOO_LARGE,
+        INVALID_MODE,
+        MISSING_JOB_DESCRIPTION,
+        JOB_DESCRIPTION_TOO_LONG,
+        INSUFFICIENT_JOB_DESCRIPTION
     }
 
     private final Reason reason;

@@ -1,5 +1,5 @@
 /* =========================================================
-   REFINECV — V2
+   REFINECV -- V2
    Clean dark career-product interface
    ========================================================= */
 
@@ -651,6 +651,44 @@ a {
     cursor: not-allowed;
 }
 
+/* =========================================================
+   RESET BUTTON (V4.2)
+   ========================================================= */
+
+.reset-button {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 11px;
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text-soft);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        border-color 0.2s ease,
+        color 0.2s ease,
+        background 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.reset-button:not(:disabled):hover {
+    border-color: var(--border-medium);
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.reset-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+
 
 .button-arrow {
     font-size: 17px;
@@ -1238,6 +1276,62 @@ a {
     margin-left: 8px;
 
     color: var(--cyan);
+}
+
+/* =========================================================
+   BOTTOM RESULTS ACTIONS (V4.2)
+   ========================================================= */
+
+.results-bottom-action {
+    margin-top: 56px;
+    padding-top: 40px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    text-align: center;
+}
+
+.results-bottom-prompt {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-soft);
+    margin: 0;
+}
+
+.results-bottom-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.results-bottom-buttons .improve-resume-btn {
+    padding: 13px 22px;
+    font-size: 12px;
+}
+
+.results-bottom-buttons .analyze-again {
+    padding: 13px 22px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+}
+
+@media (max-width: 640px) {
+    .results-bottom-buttons {
+        flex-direction: column;
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .results-bottom-buttons .improve-resume-btn,
+    .results-bottom-buttons .analyze-again {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 
@@ -2052,7 +2146,7 @@ a {
 
 
 /* =========================================================
-   V4.2 — ANALYSIS MODE SELECTION
+   V4.2 -- ANALYSIS MODE SELECTION
    ========================================================= */
 
 .mode-selection {
@@ -2164,7 +2258,7 @@ a {
 
 
 /* =========================================================
-   V4.2 — JOB DESCRIPTION INPUT
+   V4.2 -- JOB DESCRIPTION INPUT
    ========================================================= */
 
 .job-description-wrapper {
@@ -2227,4 +2321,84 @@ a {
     .mode-cards {
         grid-template-columns: 1fr;
     }
+}
+
+
+/* =========================================================
+   V4.2 -- CONTINUE BUTTON
+   ========================================================= */
+
+.continue-button {
+    width: 100%;
+    min-height: 52px;
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-radius: 11px;
+    border: 2px solid var(--cyan);
+    background: transparent;
+    color: var(--cyan);
+    font-size: 13px;
+    font-weight: 750;
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.continue-button:not(:disabled):hover {
+    background: var(--cyan);
+    color: #03131c;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(34, 211, 238, 0.18);
+}
+
+.continue-button:not(:disabled):active {
+    transform: translateY(0);
+}
+
+.continue-button:disabled {
+    opacity: 0.32;
+    cursor: not-allowed;
+}
+
+
+/* =========================================================
+   V4.2 -- UPLOAD SECTION (REVEALED AFTER CONTINUE)
+   ========================================================= */
+
+.upload-section {
+    /* Shown/hidden via the HTML `hidden` attribute managed by JS */
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    animation: fadeSlideIn 0.3s ease forwards;
+}
+
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+/* =========================================================
+   V4.2 -- MODE CARD DISABLED STATE (DURING ACTIVE ANALYSIS)
+   ========================================================= */
+
+.mode-card:disabled,
+.mode-card[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
 }

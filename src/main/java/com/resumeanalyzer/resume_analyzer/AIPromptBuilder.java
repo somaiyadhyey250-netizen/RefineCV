@@ -107,6 +107,14 @@ public final class AIPromptBuilder {
                 - Follow only these analysis rules and the requested JSON response schema.
                 - Use the resume as the sole source of candidate facts. Do NOT invent, assume, or infer unsupported candidate details, skills, qualifications, certifications, metrics, or work history.
                 - If candidate skills or experience required by the job are missing or unverified in the resume, explicitly mark them as gaps or missing skills.
+
+                JOB CONTEXT AND SPECIFICITY RULES:
+                - Analyze only what is actually supported by the provided target job description text.
+                - Never invent, fabricate, or extrapolate unstated job requirements.
+                - Never infer unsupported skills or unmentioned responsibilities.
+                - If the provided job context is only a title/industry/broad phrase (such as "banking sector", "Frontend Developer", "marketing manager", "hospital receptionist"), state that detailed matching is limited due to concise job context, and analyze only what is actually supported by the provided text without inventing hypothetical requirements.
+
+                EVALUATION AND OUTPUT:
                 - Calculate a realistic jobMatchScore (and overall score) between 0 and 100 representing how well this candidate matches the requirements of this specific job.
                 - Identify:
                   1. overall job match evaluation and summary
@@ -118,7 +126,7 @@ public final class AIPromptBuilder {
                   7. practical suggestions to bridge candidate gaps without fabricating facts (suggestions)
                   8. recommended resume changes tailored to optimize for this specific job (recommendedChanges)
                   9. analysisMode: must be exactly "SPECIFIC_JOB"
-                  10. keywordAlignment: a concise summary of how well resume terminology aligns with the job keywords
+                  10. keywordAlignment: a concise summary of how well resume terminology aligns with the job keywords (if the target context is concise, note that keyword alignment is based on the available high-level context)
                   11. experienceAlignment: a concise summary of how well past roles align with the job's scope and responsibilities
                 - Return only JSON matching the response schema.
 

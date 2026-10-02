@@ -10,6 +10,8 @@ public final class AnalysisErrorMessages {
         INVALID_UPLOAD,
         FILE_TOO_LARGE,
         INVALID_PDF,
+        INVALID_MODE,
+        INVALID_JOB_DESCRIPTION,
         PROCESSING,
         AI_COMMUNICATION,
         AI_RESPONSE,
@@ -31,6 +33,8 @@ public final class AnalysisErrorMessages {
                 case INVALID_PDF, ENCRYPTED_PDF, TOO_MANY_PAGES, PAGE_DIMENSIONS_TOO_LARGE,
                         NO_READABLE_TEXT, TEXT_TOO_LARGE -> Category.INVALID_PDF;
                 case INVALID_UPLOAD -> Category.INVALID_UPLOAD;
+                case INVALID_MODE -> Category.INVALID_MODE;
+                case MISSING_JOB_DESCRIPTION, JOB_DESCRIPTION_TOO_LONG, INSUFFICIENT_JOB_DESCRIPTION -> Category.INVALID_JOB_DESCRIPTION;
             };
         }
         if (error instanceof AICommunicationException) return Category.AI_COMMUNICATION;
@@ -46,6 +50,8 @@ public final class AnalysisErrorMessages {
         return switch (category) {
             case INVALID_UPLOAD, INVALID_PDF -> "Please upload a valid, readable PDF resume.";
             case FILE_TOO_LARGE -> "Resume file is too large. Please upload a smaller PDF.";
+            case INVALID_MODE -> "Invalid analysis mode. Please select a valid analysis mode.";
+            case INVALID_JOB_DESCRIPTION -> "Please enter a meaningful job description with enough detail to analyze the match.";
             case PROCESSING -> "We couldn't process this resume. Please try again.";
             case AI_COMMUNICATION -> "We couldn't complete the AI analysis. Please try again.";
             case AI_RESPONSE -> "We couldn't validate the AI analysis. Please try again.";

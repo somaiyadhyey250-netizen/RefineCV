@@ -212,6 +212,17 @@ public class AnalysisSessionStore {
         if (analysisId != null) sessions.remove(analysisId);
     }
 
+    public Optional<FullSession> getFullSession(String analysisId) {
+        if (analysisId == null || analysisId.isBlank()) return Optional.empty();
+        FullSession session = sessions.get(analysisId);
+        if (session == null) return Optional.empty();
+        if (Duration.between(session.getCreatedAt(), Instant.now()).toMillis() > ttlMillis) {
+            sessions.remove(analysisId);
+            return Optional.empty();
+        }
+        return Optional.of(session);
+    }
+
     public void clear() {
         sessions.clear();
     }

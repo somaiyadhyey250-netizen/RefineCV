@@ -1,5 +1,5 @@
 /* =========================================================
-   REFINECV â€” V2 FRONTEND
+   REFINECV -- V2 FRONTEND
    ========================================================= */
 
 
@@ -34,6 +34,9 @@ const modeCardGeneral = document.getElementById("modeCardGeneral");
 const modeCardJob = document.getElementById("modeCardJob");
 const jobDescriptionWrapper = document.getElementById("jobDescriptionWrapper");
 const jobDescriptionInput = document.getElementById("jobDescriptionInput");
+const continueButton = document.getElementById("continueButton");
+const uploadSection = document.getElementById("uploadSection");
+const resetButton = document.getElementById("resetButton");
 
 
 /* =========================================================
@@ -49,8 +52,8 @@ let isAnalyzing = false;
 let statusPollingTimer = null;
 const ACTIVE_ANALYSIS_STORAGE_KEY = "refinecv_active_analysis_id";
 
-/* V4.2 mode state */
-let selectedMode = "GENERAL";
+/* V4.2 mode state -- null means no mode selected yet (Continue disabled) */
+let selectedMode = null;
 let currentJobDescription = null;
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -107,6 +110,82 @@ function validateFile(file) {
 
 
 /* =========================================================
+   JOB DESCRIPTION VALIDATION (V4.2)
+   ========================================================= */
+
+const MAX_JD_LENGTH = 8000;
+const MIN_JD_LETTERS = 2;
+
+const JD_WORD_REGEX = /[a-zA-Z0-9+#.-]+/g;
+
+function isValidJobDescription(text) {
+    if (!text || typeof text !== "string") {
+        return false;
+    }
+    const trimmed = text.trim();
+    if (trimmed.length === 0 || trimmed.length > MAX_JD_LENGTH) {
+        return false;
+    }
+
+    let letterCount = 0;
+    const distinctChars = new Set();
+    for (let i = 0; i < trimmed.length; i++) {
+        const code = trimmed.charCodeAt(i);
+        const char = trimmed[i].toLowerCase();
+        if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) {
+            letterCount++;
+        }
+        if (!/\s/.test(char)) {
+            distinctChars.add(char);
+        }
+    }
+
+    // Obvious symbol spam or pure number spam
+    if (letterCount < MIN_JD_LETTERS) {
+        return false;
+    }
+
+    // Symbol/punctuation heavy
+    if (trimmed.length >= 10 && (letterCount / trimmed.length) < 0.25) {
+        return false;
+    }
+
+    // Extreme character repetition
+    if (trimmed.length >= 8 && distinctChars.size <= 2) {
+        return false;
+    }
+
+    const tokens = trimmed.toLowerCase().match(JD_WORD_REGEX) || [];
+    const words = [];
+    const uniqueWords = new Set();
+
+    for (const token of tokens) {
+        if (/[a-zA-Z]/.test(token)) {
+            words.push(token);
+            uniqueWords.add(token);
+        }
+    }
+
+    if (words.length === 0) {
+        return false;
+    }
+
+    // Extreme word repetition
+    if (words.length >= 3 && uniqueWords.size === 1) {
+        return false;
+    }
+    if (words.length >= 6 && uniqueWords.size <= 2) {
+        return false;
+    }
+    if (words.length >= 9 && uniqueWords.size <= 3) {
+        return false;
+    }
+
+    return true;
+}
+
+
+/* =========================================================
    SELECT FILE
    ========================================================= */
 
@@ -121,6 +200,9 @@ function handleFile(file) {
         resumeInput.value = "";
 
         analyzeButton.disabled = true;
+    if (resetButton) {
+        resetButton.disabled = true;
+    }
 
         selectedFile.textContent = "";
         selectedFile.classList.remove("visible");
@@ -142,8 +224,7 @@ function handleFile(file) {
     analyzeButton.disabled = false;
 
 
-    selectedFile.textContent =
-        `âœ“  ${file.name}  Â·  ${formatFileSize(file.size)}`;
+    selectedFile.textContent = `\u2713  ${file.name}  \u00B7  ${formatFileSize(file.size)}`;
 
     selectedFile.classList.add("visible");
 
@@ -330,6 +411,11 @@ dropZone.addEventListener("drop", function (event) {
    ========================================================= */
 
 function selectMode(mode) {
+    /* Locked during active analysis -- only accept resets (null) */
+    if (isAnalyzing && mode !== null) {
+        return;
+    }
+
     selectedMode = mode;
 
     if (modeCardGeneral) {
@@ -354,6 +440,11 @@ function selectMode(mode) {
             }
         }
     }
+
+    /* Enable Continue only when a mode has been selected */
+    if (continueButton) {
+        continueButton.disabled = (mode === null);
+    }
 }
 
 if (modeCardGeneral) {
@@ -365,6 +456,24 @@ if (modeCardGeneral) {
 if (modeCardJob) {
     modeCardJob.addEventListener("click", function () {
         selectMode("SPECIFIC_JOB");
+    });
+}
+
+/* Continue button: reveals upload section */
+if (continueButton) {
+    continueButton.addEventListener("click", function () {
+        if (!selectedMode) {
+            return;
+        }
+        if (uploadSection) {
+            uploadSection.hidden = false;
+            setTimeout(function () {
+                uploadSection.scrollIntoView({
+                    behavior: getScrollBehavior(),
+                    block: "nearest"
+                });
+            }, 50);
+        }
     });
 }
 
@@ -386,10 +495,15 @@ analyzeButton.addEventListener(
             return;
         }
 
+        if (!selectedMode) {
+            showMessage("Please select an analysis mode first.");
+            return;
+        }
+
         if (selectedMode === "SPECIFIC_JOB") {
             const jd = jobDescriptionInput ? jobDescriptionInput.value.trim() : "";
-            if (!jd) {
-                showMessage("Please paste a job description before analyzing in Specific Job mode.");
+            if (!isValidJobDescription(jd)) {
+                showMessage("Please enter a meaningful job description with enough detail to analyze the match.");
                 if (jobDescriptionInput) {
                     jobDescriptionInput.focus();
                 }
@@ -414,6 +528,16 @@ async function startAnalysis(file) {
     }
     isAnalyzing = true;
     stopStatusPolling();
+
+    /* Lock mode cards during analysis -- visual + logical */
+    if (modeCardGeneral) {
+        modeCardGeneral.disabled = true;
+        modeCardGeneral.setAttribute("aria-disabled", "true");
+    }
+    if (modeCardJob) {
+        modeCardJob.disabled = true;
+        modeCardJob.setAttribute("aria-disabled", "true");
+    }
 
     hideMessage();
 
@@ -484,12 +608,23 @@ async function startAnalysis(file) {
             isAnalyzing = false;
             stopStatusPolling();
             sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
-            const message = response.status === 413
-                ? "Resume file is too large. Please upload a smaller PDF."
-                : "Something went wrong while analyzing the resume. Please try again.";
+            let message = "Something went wrong while analyzing the resume. Please try again.";
+            if (response.status === 413) {
+                message = "Resume file is too large. Please upload a smaller PDF.";
+            } else if (response.status === 429) {
+                message = "You're making requests too quickly. Please wait a little and try again.";
+            }
 
             hideLoading();
             analyzeButton.disabled = false;
+            if (modeCardGeneral) {
+                modeCardGeneral.disabled = false;
+                modeCardGeneral.removeAttribute("aria-disabled");
+            }
+            if (modeCardJob) {
+                modeCardJob.disabled = false;
+                modeCardJob.removeAttribute("aria-disabled");
+            }
             showMessage(message);
             return;
         }
@@ -530,6 +665,14 @@ async function startAnalysis(file) {
         hideLoading();
 
         analyzeButton.disabled = false;
+        if (modeCardGeneral) {
+            modeCardGeneral.disabled = false;
+            modeCardGeneral.removeAttribute("aria-disabled");
+        }
+        if (modeCardJob) {
+            modeCardJob.disabled = false;
+            modeCardJob.removeAttribute("aria-disabled");
+        }
 
 
         showMessage(
@@ -846,11 +989,21 @@ function handleResult(rawData) {
    ========================================================= */
 
 function handleServerError(message) {
+    isAnalyzing = false;
+    stopStatusPolling();
+    sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
 
     hideLoading();
 
     analyzeButton.disabled = false;
-
+    if (modeCardGeneral) {
+        modeCardGeneral.disabled = false;
+        modeCardGeneral.removeAttribute("aria-disabled");
+    }
+    if (modeCardJob) {
+        modeCardJob.disabled = false;
+        modeCardJob.removeAttribute("aria-disabled");
+    }
 
     showMessage(
         message || "Resume analysis failed. Please check your resume and try again."
@@ -873,6 +1026,9 @@ function showLoading() {
 function hideLoading() {
 
     analysisLoading.hidden = true;
+    if (resetButton) {
+        resetButton.disabled = false;
+    }
 }
 
 
@@ -1010,7 +1166,24 @@ function renderResults(result) {
         "No summary was returned.";
 
     /* V4.2: job match panel shown only when mode is SPECIFIC_JOB */
-    const isJobMode = result.analysisMode === "SPECIFIC_JOB";
+    const isJobMode = (result && (result.analysisMode === "SPECIFIC_JOB" || result.mode === "SPECIFIC_JOB")) || selectedMode === "SPECIFIC_JOB";
+
+    /* Update hero heading accent according to analysis mode */
+    const heroAccent = document.getElementById("resultsHeroAccent");
+    if (heroAccent) {
+        heroAccent.textContent = isJobMode ? "matched." : "refined.";
+    }
+
+    /* Restore Improve My Resume CTA on new result rendering */
+    if (improveResumeButton) {
+        improveResumeButton.hidden = false;
+        improveResumeButton.style.display = "";
+        improveResumeButton.disabled = false;
+    }
+    const bottomPrompt = document.getElementById("resultsBottomPrompt");
+    if (bottomPrompt) {
+        bottomPrompt.textContent = "Ready to take the next step?";
+    }
     const jobMatchScore = Number.isFinite(Number(result.jobMatchScore))
         ? Number(result.jobMatchScore)
         : null;
@@ -1027,7 +1200,7 @@ function renderResults(result) {
                 <div class="score-circle" style="width:90px;height:90px;">
                     <div class="score-inner">
                         <div class="score-number" style="font-size:28px;">
-                            ${jobMatchScore !== null ? jobMatchScore : "—"}
+                            ${jobMatchScore !== null ? jobMatchScore : "&mdash;"}
                         </div>
                         <div class="score-max">
                             job fit
@@ -1295,116 +1468,99 @@ function escapeHTML(value) {
 
 
 /* =========================================================
-   ANALYZE ANOTHER RESUME
+   RESET & ANALYZE AGAIN (V4.2 SHARED FLOW)
    ========================================================= */
 
-analyzeAgain.addEventListener(
-    "click",
-    function () {
+function resetFullFlow() {
+    stopStatusPolling();
+    sessionStorage.removeItem(ACTIVE_ANALYSIS_STORAGE_KEY);
+    hideMessage();
 
-        /*
-           1. Hide old results
-        */
+    resultsSection.hidden = true;
+    currentAnalysisId = null;
+    currentAnalysisResult = null;
+    isImproving = false;
+    isAnalyzing = false;
+    currentJobDescription = null;
 
-        resultsSection.hidden = true;
-        currentAnalysisId = null;
-        currentAnalysisResult = null;
-        isImproving = false;
-        currentJobDescription = null;
-        /* V4.2 reset mode to General */
-        selectMode("GENERAL");
-        if (jobDescriptionInput) {
-            jobDescriptionInput.value = "";
-        }
-        if (improvementContainer) {
-            improvementContainer.hidden = true;
-        }
-        if (improvementContent) {
-            improvementContent.innerHTML = "";
-        }
-
-
-        /*
-           2. Hide loading screen just in case
-        */
-
-        analysisLoading.hidden = true;
-
-
-        /*
-           3. Completely remove old selected file
-        */
-
-        selectedResume = null;
-
-        resumeInput.value = "";
-
-        selectedFile.textContent = "";
-
-        selectedFile.classList.remove(
-            "visible"
-        );
-
-
-        /*
-           4. Reset upload area text
-        */
-
-        dropTitle.textContent =
-            "Drop your resume here";
-
-        dropSubtitle.textContent =
-            "or click anywhere here to browse";
-
-
-        /*
-           5. Disable Analyze until
-              a new PDF is selected
-        */
-
-        analyzeButton.disabled = true;
-
-
-        /*
-           6. Reset all analysis steps
-        */
-
-        resetAnalysisSteps();
-
-
-        /*
-           7. Clear previous result HTML
-        */
-
-        resultsContent.innerHTML = "";
-
-
-        /*
-           8. Scroll back to the upload card.
-              The upload card is inside the hero section.
-        */
-
-        const uploadCard =
-            document.querySelector(".upload-card");
-
-
-        if (uploadCard) {
-
-            uploadCard.scrollIntoView({
-                behavior: getScrollBehavior(),
-                block: "center"
-            });
-
-        } else {
-
-            window.scrollTo({
-                top: 0,
-                behavior: getScrollBehavior()
-            });
-        }
-
+    /* V4.2: Reset mode to unselected, restore Continue gate */
+    selectMode(null);
+    if (jobDescriptionInput) {
+        jobDescriptionInput.value = "";
     }
-);
+
+    /* Re-enable and unlock mode cards */
+    if (modeCardGeneral) {
+        modeCardGeneral.disabled = false;
+        modeCardGeneral.removeAttribute("aria-disabled");
+    }
+    if (modeCardJob) {
+        modeCardJob.disabled = false;
+        modeCardJob.removeAttribute("aria-disabled");
+    }
+
+    if (resetButton) {
+        resetButton.disabled = false;
+    }
+
+    /* Hide upload section -- user must press Continue again */
+    if (uploadSection) {
+        uploadSection.hidden = true;
+    }
+
+    if (improvementContainer) {
+        improvementContainer.hidden = true;
+    }
+    if (improvementContent) {
+        improvementContent.innerHTML = "";
+    }
+
+    analysisLoading.hidden = true;
+
+    selectedResume = null;
+    resumeInput.value = "";
+    selectedFile.textContent = "";
+    selectedFile.classList.remove("visible");
+
+    dropTitle.textContent = "Drop your resume here";
+    dropSubtitle.textContent = "or click anywhere here to browse";
+
+    analyzeButton.disabled = true;
+
+    resetAnalysisSteps();
+
+    resultsContent.innerHTML = "";
+
+    const heroAccent = document.getElementById("resultsHeroAccent");
+    if (heroAccent) {
+        heroAccent.textContent = "refined.";
+    }
+
+    if (improveResumeButton) {
+        improveResumeButton.hidden = false;
+        improveResumeButton.style.display = "";
+        improveResumeButton.disabled = false;
+    }
+    const bottomPrompt = document.getElementById("resultsBottomPrompt");
+    if (bottomPrompt) {
+        bottomPrompt.textContent = "Ready to take the next step?";
+    }
+
+    const uploadCard = document.querySelector(".upload-card");
+    if (uploadCard) {
+        uploadCard.scrollIntoView({
+            behavior: getScrollBehavior(),
+            block: "center"
+        });
+    }
+}
+
+analyzeAgain.addEventListener("click", resetFullFlow);
+
+
+if (resetButton) {
+    resetButton.addEventListener("click", resetFullFlow);
+}
 
 
 /* =========================================================
@@ -1515,6 +1671,16 @@ async function requestImprovements() {
         const improvementData = await response.json();
         renderImprovements(improvementData);
 
+        /* V4.2 UX: Once improvements are rendered, hide "Improve My Resume" button */
+        if (improveResumeButton) {
+            improveResumeButton.hidden = true;
+            improveResumeButton.style.display = "none";
+        }
+        const bottomPrompt = document.getElementById("resultsBottomPrompt");
+        if (bottomPrompt) {
+            bottomPrompt.textContent = "Ready to analyze another resume?";
+        }
+
         if (improvementLoading) {
             improvementLoading.hidden = true;
         }
@@ -1538,10 +1704,15 @@ async function requestImprovements() {
         if (improvementContainer) {
             improvementContainer.hidden = true;
         }
+        if (improveResumeButton) {
+            improveResumeButton.hidden = false;
+            improveResumeButton.style.display = "";
+            improveResumeButton.disabled = false;
+        }
         showMessage(err.message || "Failed to generate resume improvements. Please try again.");
     } finally {
         isImproving = false;
-        if (improveResumeButton) {
+        if (improveResumeButton && !improveResumeButton.hidden) {
             improveResumeButton.disabled = false;
         }
     }
@@ -1571,7 +1742,7 @@ function renderImprovements(data) {
                 </p>
             </div>
             <button type="button" id="copyAllImprovementsBtn" class="copy-all-btn">
-                ðŸ“‹ Copy All Improvements
+                &#128203; Copy All Improvements
             </button>
         </div>
 
@@ -1582,7 +1753,7 @@ function renderImprovements(data) {
                     <h4>Improved Professional Summary</h4>
                 </div>
                 <button type="button" class="copy-snippet-btn" data-copy="${escapeHTML(summary)}">
-                    ðŸ“‹ Copy Summary
+                    &#128203; Copy Summary
                 </button>
             </div>
             <p class="improved-summary-text">${escapeHTML(summary)}</p>
@@ -1604,7 +1775,7 @@ function renderImprovements(data) {
                 <div class="bullet-card-header">
                     <span class="bullet-section-tag">${escapeHTML(bullet.section || "Experience")}</span>
                     <button type="button" class="copy-snippet-btn" data-copy="${escapeHTML(bullet.improved)}">
-                        ðŸ“‹ Copy Bullet
+                        &#128203; Copy Bullet
                     </button>
                 </div>
 
@@ -1621,7 +1792,7 @@ function renderImprovements(data) {
                 </div>
 
                 <div class="bullet-explanation-callout">
-                    <span class="explanation-icon">ðŸ’¡</span>
+                    <span class="explanation-icon">&#128161;</span>
                     <span><strong>Why this works:</strong> ${escapeHTML(bullet.explanation)}</span>
                 </div>
             </div>
@@ -1637,7 +1808,7 @@ function renderImprovements(data) {
                 <span class="card-eyebrow">STRATEGIC ENHANCEMENTS</span>
                 <h4>Key Improvements Applied</h4>
                 <ul class="improvement-check-list">
-                    ${explanations.map(exp => `<li>âœ“ ${escapeHTML(exp)}</li>`).join("")}
+                    ${explanations.map(exp => `<li>&#10003; ${escapeHTML(exp)}</li>`).join("")}
                 </ul>
             </div>
 
@@ -1645,7 +1816,7 @@ function renderImprovements(data) {
                 <span class="card-eyebrow">ACTIONABLE NEXT STEPS</span>
                 <h4>Recommended Next Steps</h4>
                 <ul class="improvement-action-list">
-                    ${actions.map(act => `<li>â†’ ${escapeHTML(act)}</li>`).join("")}
+                    ${actions.map(act => `<li>&#8594; ${escapeHTML(act)}</li>`).join("")}
                 </ul>
             </div>
         </div>
@@ -1662,7 +1833,7 @@ function attachCopyListeners(data) {
         btn.addEventListener("click", function () {
             const textToCopy = btn.getAttribute("data-copy");
             if (textToCopy) {
-                copyTextToClipboard(textToCopy, btn, "ðŸ“‹ Copy");
+                copyTextToClipboard(textToCopy, btn, "\uD83D\uDCCB Copy");
             }
         });
     });
@@ -1671,7 +1842,7 @@ function attachCopyListeners(data) {
     if (copyAllBtn) {
         copyAllBtn.addEventListener("click", function () {
             const allText = buildAllImprovementsText(data);
-            copyTextToClipboard(allText, copyAllBtn, "ðŸ“‹ Copy All Improvements");
+            copyTextToClipboard(allText, copyAllBtn, "\uD83D\uDCCB Copy All Improvements");
         });
     }
 }
@@ -1695,7 +1866,7 @@ function buildAllImprovementsText(data) {
     if (Array.isArray(data.actionableChanges) && data.actionableChanges.length > 0) {
         output += "=== RECOMMENDED ACTIONS ===\n";
         data.actionableChanges.forEach(function (a) {
-            output += "â€¢ " + a + "\n";
+            output += "\u2022 " + a + "\n";
         });
     }
 
@@ -1730,7 +1901,7 @@ function copyTextToClipboard(text, btnElement, defaultText) {
 
 function showCopySuccess(btnElement, defaultText) {
     const originalText = btnElement.textContent;
-    btnElement.textContent = "âœ“ Copied!";
+    btnElement.textContent = "\u2713 Copied!";
     btnElement.classList.add("copied");
     setTimeout(function () {
         btnElement.textContent = originalText;

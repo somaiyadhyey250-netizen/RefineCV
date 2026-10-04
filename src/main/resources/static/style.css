@@ -160,7 +160,11 @@ h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; font-family:
 }
 .header-row { display: flex; align-items: center; justify-content: space-between; height: 68px; }
 .header-right { display: flex; align-items: center; gap: 14px; }
-.brand { display: inline-flex; align-items: center; text-decoration: none; color: var(--ink); line-height: 1; flex-shrink: 0; }
+.brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; color: var(--ink); line-height: 1; flex-shrink: 0; }
+.brand-icon { width: 38px; height: 38px; flex: none; display: block; }
+.brand-icon--dark { display: none; }
+:root[data-theme="dark"] .brand-icon--light, [data-theme="dark"] .brand-icon--light { display: none; }
+:root[data-theme="dark"] .brand-icon--dark, [data-theme="dark"] .brand-icon--dark { display: block; }
 .brand-word { font-family: var(--font-display); font-weight: 800; font-size: 1.38rem; letter-spacing: -0.035em; color: var(--ink); display: inline-flex; align-items: center; white-space: nowrap; }
 .brand-cv {
   font-weight: 850;
@@ -263,7 +267,7 @@ h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; font-family:
   padding-bottom: 80px;
   align-items: start;
 }
-.hero-copy h1 { max-width: 14ch; }
+.hero-copy h1 { max-width: 18ch; }
 .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px; align-items: center; }
 .hero-pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; list-style: none; padding: 0; }
 .hero-pills li { display: inline-flex; align-items: center; gap: 6px; font-size: .84rem; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); padding: 5px 12px; border-radius: 99px; }
@@ -687,7 +691,8 @@ ul.chips, ul.marks, ul.plain, ul.checks { list-style: none; margin: 0; padding: 
 /* ---------- Footer ---------- */
 .site-footer { border-top: 1px solid var(--line); padding: 24px 0; color: var(--ink-3); font-size: .88rem; flex-shrink: 0; }
 .foot-row { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: center; }
-.foot-brand { display: inline-flex; align-items: center; font-weight: 500; color: var(--ink-2); }
+.foot-brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 500; color: var(--ink-2); }
+.foot-brand .brand-icon { width: 28px; height: 28px; }
 .foot-brand-text { display: flex; flex-direction: column; line-height: 1.25; }
 .foot-brand-title { font-family: var(--font-display, inherit); font-weight: 750; font-size: 1.02rem; letter-spacing: -0.025em; color: var(--ink); display: inline-flex; align-items: center; }
 .foot-cv { margin-left: 5px; font-size: .84rem; padding: 1px 6px; }
@@ -1416,6 +1421,7 @@ ul.chips, ul.marks, ul.plain, ul.checks { list-style: none; margin: 0; padding: 
   .menu-toggle { display: inline-flex; }
   .header-right { gap: 8px; }
   .header-row { height: 64px; }
+  .brand-icon { width: 32px; height: 32px; }
 
   /* Mobile Navigation Drawer */
   .mobile-nav {
@@ -1664,6 +1670,8 @@ ul.chips, ul.marks, ul.plain, ul.checks { list-style: none; margin: 0; padding: 
   /* Global Gutters & Header */
   .wrap { padding: 0 16px; }
   .header-row { height: 58px; }
+  .brand { gap: 8px; }
+  .brand-icon { width: 28px; height: 28px; }
   .brand-word { font-size: 1.22rem; letter-spacing: -0.03em; }
   .brand-cv { font-size: .86rem; padding: 1px 6px; margin-left: 2px; }
   .theme-toggle { width: 36px; height: 36px; min-width: 36px; min-height: 36px; }

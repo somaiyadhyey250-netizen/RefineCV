@@ -61,6 +61,9 @@ public class ResumeController {
     private final AnalysisSessionStore sessionStore;
     private final Map<String, AnalysisRequestState> activeRequests = new ConcurrentHashMap<>();
 
+    @Value("${refinecv.app.base-url:}")
+    private String configuredBaseUrl = "";
+
 
     @Autowired
     public ResumeController(
@@ -125,8 +128,72 @@ public class ResumeController {
 
 
     /* =========================================
-       PRODUCT PAGES
+       PRODUCT PAGES & SEO
     ========================================= */
+
+    @GetMapping(value = "/robots.txt", produces = MediaType.TEXT_PLAIN_VALUE)
+    @ResponseBody
+    public String robotsTxt() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# RefineCV Robots Policy\n");
+        sb.append("User-agent: *\n");
+        sb.append("Allow: /\n");
+        sb.append("Disallow: /api/\n");
+        if (configuredBaseUrl != null && !configuredBaseUrl.isBlank()) {
+            sb.append("\nSitemap: ").append(configuredBaseUrl.trim().replaceAll("/+$", "")).append("/sitemap.xml\n");
+        }
+        return sb.toString();
+    }
+
+    @GetMapping(value = "/sitemap.xml", produces = "application/xml;charset=UTF-8")
+    @ResponseBody
+    public String sitemapXml(HttpServletRequest request) {
+        String baseUrl = resolveBaseUrl(request);
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n" +
+                "  <url>\n" +
+                "    <loc>" + baseUrl + "/</loc>\n" +
+                "    <changefreq>weekly</changefreq>\n" +
+                "    <priority>1.0</priority>\n" +
+                "  </url>\n" +
+                "  <url>\n" +
+                "    <loc>" + baseUrl + "/analyze</loc>\n" +
+                "    <changefreq>weekly</changefreq>\n" +
+                "    <priority>0.9</priority>\n" +
+                "  </url>\n" +
+                "  <url>\n" +
+                "    <loc>" + baseUrl + "/compare</loc>\n" +
+                "    <changefreq>weekly</changefreq>\n" +
+                "    <priority>0.9</priority>\n" +
+                "  </url>\n" +
+                "  <url>\n" +
+                "    <loc>" + baseUrl + "/interview-prep</loc>\n" +
+                "    <changefreq>weekly</changefreq>\n" +
+                "    <priority>0.9</priority>\n" +
+                "  </url>\n" +
+                "</urlset>";
+    }
+
+    private String resolveBaseUrl(HttpServletRequest request) {
+        if (configuredBaseUrl != null && !configuredBaseUrl.isBlank()) {
+            return configuredBaseUrl.trim().replaceAll("/+$", "");
+        }
+        if (request == null) {
+            return "";
+        }
+        String proto = request.getHeader("X-Forwarded-Proto");
+        String scheme = (proto != null && !proto.isBlank()) ? proto.trim() : request.getScheme();
+        String host = request.getHeader("X-Forwarded-Host");
+        if (host == null || host.isBlank()) {
+            host = request.getHeader("Host");
+        }
+        if (host != null && !host.isBlank()) {
+            return scheme + "://" + host.trim();
+        }
+        int port = request.getServerPort();
+        boolean isDefault = ("http".equalsIgnoreCase(scheme) && port == 80) || ("https".equalsIgnoreCase(scheme) && port == 443);
+        return scheme + "://" + request.getServerName() + (isDefault ? "" : ":" + port);
+    }
 
     @GetMapping("/")
     public String home() {

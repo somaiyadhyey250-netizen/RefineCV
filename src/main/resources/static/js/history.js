@@ -1,6 +1,7 @@
 /* ==========================================================
    RefineCV /history Session History Logic
    Renders active session analyses, timestamp, score, and links
+   Provides accessible "Clear History" confirmation and execution
    ========================================================== */
 
 (function () {
@@ -9,9 +10,15 @@
   document.addEventListener('DOMContentLoaded', async function () {
     var historyList = document.getElementById('historyList');
     var emptyState = document.getElementById('emptyState');
+    var clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    var clearConfirmDialog = document.getElementById('clearConfirmDialog');
+    var cancelClearBtn = document.getElementById('cancelClearBtn');
+    var confirmClearBtn = document.getElementById('confirmClearBtn');
+    var historyFeedback = document.getElementById('historyFeedback');
+
     if (!historyList) return;
 
-    var clientHistory = window.RefineCVSession.getHistory() || [];
+    var clientHistory = (window.RefineCVSession && window.RefineCVSession.getHistory()) || [];
 
     // Also fetch server-side active sessions from AnalysisSessionStore
     try {
@@ -20,14 +27,24 @@
         var serverItems = await res.json();
         if (Array.isArray(serverItems)) {
           serverItems.forEach(function (si) {
+            if (!si || !si.analysisId || si.analysisId === 'demo') return;
+            if (si.type !== 'COMPARE' && String(si.analysisId).startsWith('cmp-')) return;
+            if (si.fileName === 'Sample_Resume.pdf' || si.fileName === 'Uploaded_Resume.pdf') return;
+            if (si.fileNameB === 'Sample_Resume.pdf' || si.fileNameB === 'Uploaded_Resume.pdf') return;
+
             var exists = clientHistory.some(function (ch) { return ch.analysisId === si.analysisId; });
             if (!exists) {
               clientHistory.push({
                 analysisId: si.analysisId,
+                type: si.type || 'ANALYSIS',
                 mode: si.mode,
                 fileName: si.fileName || 'Resume.pdf',
+                fileNameB: si.fileNameB || null,
                 score: si.score || 0,
-                date: new Date(si.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                scoreB: si.scoreB != null ? si.scoreB : null,
+                verdict: si.verdict || null,
+                jobContext: si.jobContext || null,
+                date: new Date(si.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + new Date(si.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               });
             }
           });
@@ -37,40 +54,177 @@
       console.warn('Could not fetch server history, using local history', e);
     }
 
-    if (!clientHistory || !clientHistory.length) {
-      if (emptyState) emptyState.hidden = false;
-      historyList.hidden = true;
-      return;
+    function renderHistory() {
+      if (!clientHistory || !clientHistory.length) {
+        if (emptyState) emptyState.hidden = false;
+        historyList.hidden = true;
+        historyList.innerHTML = '';
+        if (clearHistoryBtn) clearHistoryBtn.disabled = true;
+        return;
+      }
+
+      if (emptyState) emptyState.hidden = true;
+      historyList.hidden = false;
+      historyList.innerHTML = '';
+      if (clearHistoryBtn) clearHistoryBtn.disabled = false;
+
+      clientHistory.forEach(function (item) {
+        var card = document.createElement('div');
+        card.className = 'report-card';
+        card.style.padding = '22px 28px';
+
+        var isCompare = item.type === 'COMPARE';
+
+        if (isCompare) {
+          var targetUrl = '/compare/' + encodeURIComponent(item.analysisId) + '?from=history';
+          var isJob = !!item.jobContext;
+          var verdictText = item.verdict ? item.verdict : ('A: ' + (item.score || 0) + ' vs B: ' + (item.scoreB || 0));
+          var filesTitle = window.escapeHTML(item.fileName || 'Resume A') + ' vs ' + window.escapeHTML(item.fileNameB || 'Resume B');
+          var jobMeta = isJob ? '<span style="display: block; font-size: .84rem; color: var(--ink-2); margin-top: 2px;">Role Context: ' + window.escapeHTML(item.jobContext.length > 50 ? item.jobContext.substring(0, 50) + '...' : item.jobContext) + '</span>' : '';
+
+          card.innerHTML =
+            '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">' +
+              '<div>' +
+                '<span class="card-eyebrow" style="margin-bottom: 2px;">Resume Comparison</span>' +
+                '<strong style="font-size: 1.1rem; display: block; margin-bottom: 2px;">' + filesTitle + '</strong>' +
+                '<small style="color: var(--ink-3);">Conducted ' + window.escapeHTML(item.date || 'Recent') + ' &bull; ID: ' + window.escapeHTML(item.analysisId) + '</small>' +
+                jobMeta +
+              '</div>' +
+              '<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">' +
+                '<span class="file-badge" style="font-weight: 700; color: var(--pen);">' + window.escapeHTML(verdictText) + '</span>' +
+                '<span class="makeover-pill">' + (isJob ? 'Job-Specific Comparison' : 'General Comparison') + '</span>' +
+                '<a href="' + targetUrl + '" class="btn btn-primary btn-sm">View Comparison &rarr;</a>' +
+              '</div>' +
+            '</div>';
+        } else {
+          var isJobMode = item.mode === 'SPECIFIC_JOB';
+          var reportUrl = (isJobMode ? ('/job-analysis/' + encodeURIComponent(item.analysisId)) : ('/analysis/' + encodeURIComponent(item.analysisId))) + '?from=history';
+
+          card.innerHTML =
+            '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">' +
+              '<div>' +
+                '<strong style="font-size: 1.1rem; display: block; margin-bottom: 2px;">' + window.escapeHTML(item.fileName || 'Resume.pdf') + '</strong>' +
+                '<small style="color: var(--ink-3);">Conducted ' + window.escapeHTML(item.date || 'Recent') + ' &bull; ID: ' + window.escapeHTML(item.analysisId) + '</small>' +
+              '</div>' +
+              '<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">' +
+                '<span class="file-badge" style="font-weight: 700; color: var(--pen);">Score: ' + (item.score || 0) + '/100</span>' +
+                '<span class="makeover-pill">' + (isJobMode ? 'Specific Job Match' : 'General Review') + '</span>' +
+                '<a href="' + reportUrl + '" class="btn btn-primary btn-sm">View Report &rarr;</a>' +
+              '</div>' +
+            '</div>';
+        }
+
+        historyList.appendChild(card);
+      });
     }
 
-    if (emptyState) emptyState.hidden = true;
-    historyList.hidden = false;
-    historyList.innerHTML = '';
+    renderHistory();
 
-    clientHistory.forEach(function (item) {
-      var card = document.createElement('div');
-      card.className = 'report-card';
-      card.style.padding = '22px 28px';
+    var feedbackTimer = null;
+    function showFeedback(msg, typeClass) {
+      if (!historyFeedback) return;
+      if (feedbackTimer) clearTimeout(feedbackTimer);
+      historyFeedback.textContent = msg;
+      historyFeedback.className = 'history-feedback ' + typeClass;
+      historyFeedback.hidden = false;
+      historyFeedback.style.opacity = '1';
 
-      var isJob = item.mode === 'SPECIFIC_JOB';
-      var targetUrl = (isJob ? ('/job-analysis/' + encodeURIComponent(item.analysisId)) : ('/analysis/' + encodeURIComponent(item.analysisId))) + '?from=history';
+      feedbackTimer = setTimeout(function () {
+        historyFeedback.style.opacity = '0';
+        setTimeout(function () {
+          historyFeedback.hidden = true;
+        }, 300);
+      }, 4000);
+    }
 
-      card.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-          <div>
-            <strong style="font-size: 1.1rem; display: block; margin-bottom: 2px;">${window.escapeHTML(item.fileName || 'Resume.pdf')}</strong>
-            <small style="color: var(--ink-3);">Conducted ${window.escapeHTML(item.date || 'Recent')} &bull; ID: ${window.escapeHTML(item.analysisId)}</small>
-          </div>
-          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-            <span class="file-badge" style="font-weight: 700; color: var(--pen);">Score: ${item.score || 0}/100</span>
-            <span class="makeover-pill">${isJob ? 'Specific Job Match' : 'General Review'}</span>
-            <a href="${targetUrl}" class="btn btn-primary btn-sm">View Report &rarr;</a>
-          </div>
-        </div>
-      `;
+    // Modal dialog controls
+    if (clearHistoryBtn && clearConfirmDialog) {
+      clearHistoryBtn.addEventListener('click', function () {
+        if (clearHistoryBtn.disabled) return;
+        if (typeof clearConfirmDialog.showModal === 'function') {
+          clearConfirmDialog.showModal();
+        } else {
+          clearConfirmDialog.setAttribute('open', '');
+        }
+        if (cancelClearBtn) {
+          cancelClearBtn.focus();
+        }
+      });
 
-      historyList.appendChild(card);
-    });
+      if (cancelClearBtn) {
+        cancelClearBtn.addEventListener('click', function () {
+          if (typeof clearConfirmDialog.close === 'function') {
+            clearConfirmDialog.close();
+          } else {
+            clearConfirmDialog.removeAttribute('open');
+          }
+        });
+      }
+
+      clearConfirmDialog.addEventListener('close', function () {
+        if (clearHistoryBtn && !clearHistoryBtn.disabled) {
+          clearHistoryBtn.focus();
+        }
+      });
+
+      // Close when clicking the backdrop
+      clearConfirmDialog.addEventListener('click', function (event) {
+        var rect = clearConfirmDialog.getBoundingClientRect();
+        var clickedInside = (
+          rect.top <= event.clientY && event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX && event.clientX <= rect.left + rect.width
+        );
+        if (!clickedInside) {
+          if (typeof clearConfirmDialog.close === 'function') {
+            clearConfirmDialog.close();
+          } else {
+            clearConfirmDialog.removeAttribute('open');
+          }
+        }
+      });
+
+      if (confirmClearBtn) {
+        confirmClearBtn.addEventListener('click', async function () {
+          confirmClearBtn.disabled = true;
+          if (cancelClearBtn) cancelClearBtn.disabled = true;
+          var originalText = confirmClearBtn.textContent;
+          confirmClearBtn.textContent = 'Clearing...';
+
+          try {
+            var delRes = await fetch('/api/history', { method: 'DELETE' });
+            if (!delRes.ok) {
+              throw new Error('Server returned status ' + delRes.status);
+            }
+
+            if (typeof clearConfirmDialog.close === 'function') {
+              clearConfirmDialog.close();
+            } else {
+              clearConfirmDialog.removeAttribute('open');
+            }
+
+            if (window.RefineCVSession && typeof window.RefineCVSession.clearHistory === 'function') {
+              window.RefineCVSession.clearHistory();
+            }
+
+            clientHistory = [];
+            renderHistory();
+            showFeedback('History cleared.', 'is-success');
+          } catch (err) {
+            console.error('Failed to clear history:', err);
+            if (typeof clearConfirmDialog.close === 'function') {
+              clearConfirmDialog.close();
+            } else {
+              clearConfirmDialog.removeAttribute('open');
+            }
+            showFeedback('Failed to clear history. Please try again.', 'is-error');
+          } finally {
+            confirmClearBtn.disabled = false;
+            if (cancelClearBtn) cancelClearBtn.disabled = false;
+            confirmClearBtn.textContent = originalText;
+          }
+        });
+      }
+    }
   });
 
 })();

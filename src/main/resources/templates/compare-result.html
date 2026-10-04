@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resume Comparison | RefineCV</title>
+  <meta name="description" content="Side-by-side resume comparison report with category scorecards, grounded evidence, and actionable takeaways.">
+
+  <link rel="icon" type="image/svg+xml" href="/refinecv_brand_assets/svg/refinecv-favicon.svg">
+  <link rel="icon" href="/refinecv_brand_assets/favicon/favicon.ico" sizes="any">
+
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('refinecv-theme');
+        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (dark ? 'dark' : 'light'));
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body th:attr="data-comparison-id=${comparisonId}">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="/" aria-label="RefineCV home">
+        <span class="brand-word">Refine<span class="brand-cv">CV</span></span>
+      </a>
+
+      <div class="header-right">
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/analyze" class="nav-link">Analyze</a>
+          <a href="/compare" class="nav-link is-active">Compare</a>
+          <a href="/history" class="nav-link">History</a>
+        </nav>
+
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch theme">
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+
+        <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileNav">
+          <svg class="icon-menu" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <svg class="icon-close" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Drawer -->
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation" hidden>
+      <div class="wrap mobile-nav-inner">
+        <a href="/" class="mobile-nav-link">Home</a>
+        <a href="/#what-you-get" class="mobile-nav-link">What you get</a>
+        <a href="/#how-it-works" class="mobile-nav-link">How it works</a>
+        <a href="/history" class="mobile-nav-link">History</a>
+        <a href="/analyze" class="mobile-nav-link">Analyze Resume</a>
+        <a href="/compare" class="mobile-nav-link mobile-nav-cta is-active">Compare Resumes &rarr;</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main" class="report-main">
+    <div class="wrap report-wrap">
+      <!-- Top context bar -->
+      <div class="report-topbar">
+        <div class="report-topbar-left" style="flex-wrap: wrap;">
+          <a href="/compare" class="btn btn-quiet btn-sm nav-back-btn" id="compareBackBtn">&larr; Back to Compare</a>
+          <span class="file-badge" id="reportFileA">Resume A</span>
+          <span style="color: var(--ink-3); font-weight: 700; font-size: .88rem;">vs</span>
+          <span class="file-badge" id="reportFileB">Resume B</span>
+          <span class="report-date" id="reportDate">Evaluated with RefineCV</span>
+        </div>
+        <div class="topbar-actions">
+          <a href="/compare" class="btn btn-quiet btn-sm">Compare Another Pair</a>
+          <button class="btn btn-quiet btn-sm" type="button" id="printBtn">Save as PDF</button>
+        </div>
+      </div>
+
+      <!-- Edge Case: Identical Resumes Alert -->
+      <div class="compare-alert-banner alert-identical" id="identicalBanner" hidden>
+        <div class="alert-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="alert-body">
+          <strong>Identical Documents Detected</strong>
+          <p id="identicalMessage">These resumes appear to be identical, so there is no meaningful difference to compare.</p>
+        </div>
+        <a href="/compare" class="btn btn-quiet btn-sm">Compare Another Pair</a>
+      </div>
+
+      <!-- Edge Case: Unreadable Resume Alert -->
+      <div class="compare-alert-banner alert-unreadable" id="unreadableBanner" hidden>
+        <div class="alert-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="alert-body">
+          <strong>Fair Comparison Unavailable</strong>
+          <p id="unreadableMessage">One or both resumes could not be reliably read, so an objective comparison cannot be completed.</p>
+        </div>
+        <a href="/compare" class="btn btn-quiet btn-sm">Choose Other Files</a>
+      </div>
+
+      <!-- Main Verdict Hero Card -->
+      <section class="report-card card-hero compare-verdict-card" id="verdictCard">
+        <span class="card-eyebrow">Comparison Evaluation</span>
+        <h1 class="h-md" id="verdictHeadline" style="margin-top: 4px;">Evaluating Comparison...</h1>
+        <p class="card-subtitle" id="verdictSubtitle">Overall comparison of two resumes.</p>
+
+        <!-- Scores Side-by-Side -->
+        <div class="compare-score-overview">
+          <!-- Resume A Score Tile -->
+          <div class="compare-score-tile" id="tileA">
+            <div class="tile-header">
+              <span class="tile-tag">Resume A</span>
+              <span class="tile-filename" id="scoreNameA">Resume_A.pdf</span>
+            </div>
+            <div class="tile-num-wrap">
+              <span class="tile-num" id="totalScoreA">0</span>
+              <span class="tile-total">/ 100</span>
+            </div>
+            <div class="tile-bar-bg" aria-hidden="true">
+              <div class="tile-bar-fill" id="totalBarA" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Comparative Divider -->
+          <div class="compare-score-divider">
+            <span class="vs-circle">VS</span>
+            <span class="diff-badge" id="scoreDiffBadge">0 pts diff</span>
+          </div>
+
+          <!-- Resume B Score Tile -->
+          <div class="compare-score-tile" id="tileB">
+            <div class="tile-header">
+              <span class="tile-tag">Resume B</span>
+              <span class="tile-filename" id="scoreNameB">Resume_B.pdf</span>
+            </div>
+            <div class="tile-num-wrap">
+              <span class="tile-num" id="totalScoreB">0</span>
+              <span class="tile-total">/ 100</span>
+            </div>
+            <div class="tile-bar-bg" aria-hidden="true">
+              <div class="tile-bar-fill" id="totalBarB" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Why Winner Leads Box (only rendered when diff >= 4) -->
+        <div class="winner-differentiators-box" id="differentiatorsBox" hidden>
+          <div class="differentiators-head">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <h2 class="h-sm" id="differentiatorsTitle">Why Resume leads</h2>
+          </div>
+          <ul class="differentiators-list" id="differentiatorsList">
+            <!-- Exactly 3 short factual bullets -->
+          </ul>
+        </div>
+
+        <!-- Neutral Statement (when diff <= 3 / too close to call) -->
+        <div class="neutral-verdict-box" id="neutralVerdictBox" hidden>
+          <p id="neutralVerdictText">These resumes are closely matched across all evaluated categories. Neither candidate possesses an overwhelming advantage.</p>
+        </div>
+      </section>
+
+      <!-- Category Scorecard Section -->
+      <section class="compare-scorecard-section" id="scorecardSection">
+        <div class="scorecard-section-head">
+          <div>
+            <span class="card-eyebrow">Category Scorecard</span>
+            <h2 class="h-md" style="font-size: 1.6rem;">Side-by-Side Category Breakdown</h2>
+          </div>
+          <p class="scorecard-subtitle">
+            Every category is scored strictly from documented evidence in the resume text. Max total is 100 points.
+          </p>
+        </div>
+
+        <div class="category-cards-list" id="categoryCardsList">
+          <!-- Dynamically populated 6 categories -->
+        </div>
+      </section>
+
+      <!-- Overall Takeaway Card -->
+      <section class="report-card takeaway-card" id="takeawayCard">
+        <span class="card-eyebrow">Executive Summary</span>
+        <h2 class="card-title">Overall Takeaway</h2>
+        <p class="takeaway-text" id="overallTakeawayText"></p>
+      </section>
+
+      <!-- What to Borrow Section -->
+      <section class="report-card borrow-card" id="borrowCard">
+        <div class="borrow-header">
+          <div>
+            <span class="card-eyebrow">Mutual Elevation</span>
+            <h2 class="card-title">What to Borrow</h2>
+          </div>
+          <p class="card-desc" style="margin: 0; color: var(--ink-3); font-size: .88rem;">
+            Constructive, non-punitive insights showing how each candidate can strengthen their resume by learning from the other.
+          </p>
+        </div>
+
+        <div class="borrow-grid">
+          <!-- Resume A borrows from B -->
+          <div class="borrow-col" id="borrowColA">
+            <div class="borrow-col-head">
+              <span class="borrow-tag">Candidate A</span>
+              <h3 class="borrow-title" id="borrowTitleA">Resume A can borrow from Resume B</h3>
+            </div>
+            <ul class="borrow-list" id="borrowListA"></ul>
+          </div>
+
+          <!-- Resume B borrows from A -->
+          <div class="borrow-col" id="borrowColB">
+            <div class="borrow-col-head">
+              <span class="borrow-tag">Candidate B</span>
+              <h3 class="borrow-title" id="borrowTitleB">Resume B can borrow from Resume A</h3>
+            </div>
+            <ul class="borrow-list" id="borrowListB"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Action Bar -->
+      <div class="report-bottom-bar compare-bottom-bar">
+        <div class="bottom-bar-left">
+          <a href="/compare" class="btn btn-quiet" id="bottomCompareAnother">Compare Another Pair</a>
+          <a href="/" class="btn btn-quiet">Back to Home</a>
+          <button class="btn btn-quiet" type="button" onclick="window.print()">Save as PDF</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-row">
+      <div class="foot-brand">
+        <div class="foot-brand-text">
+          <div class="foot-brand-title">Refine<span class="brand-cv foot-cv">CV</span></div>
+          <span class="foot-subtitle">resume intelligence</span>
+        </div>
+      </div>
+      <span class="foot-creator">
+        <span>Built by <a href="https://somaiyadhyey250-netizen.github.io/WebTechnology_P5/" target="_blank" rel="noopener">Dhyey Somaiya</a></span>
+        <span class="foot-upgrow" aria-hidden="true"><svg class="upgrow-mark" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 11.5L6.5 7.5L9.5 10.5L14 5M14 5H10.5M14 5V8.5"/></svg></span>
+      </span>
+    </div>
+  </footer>
+
+  <button class="scroll-top" id="scrollTopBtn" type="button" aria-label="Scroll to top" title="Scroll to top">↑</button>
+
+  <script th:inline="javascript">
+    /*<![CDATA[*/
+    window.__INITIAL_COMPARISON__ = /*[[${comparisonResult}]]*/ null;
+    window.__JOB_DESC__ = /*[[${jobDescription}]]*/ null;
+    /*]]>*/
+  </script>
+  <script src="/js/common.js"></script>
+  <script src="/js/compare-report.js"></script>
+</body>
+</html>

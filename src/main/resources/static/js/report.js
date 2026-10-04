@@ -12,7 +12,7 @@
   // Sample baseline data for demo mode
   var DEMO_DATA = {
     score: 65,
-    summary: "Mahek Somaiya is a finance postgraduate with 1.5 years of experience in student visa processing and a 1 month banking internship. She demonstrates strong communication, client coordination and presentation skills, but the resume lacks quantifiable achievements, advanced technical tools, and industry-specific certifications. The document is moderately ATS-friendly but needs formatting and keyword optimization.",
+    summary: "Dhyey Somaiya is a finance postgraduate with 1.5 years of experience in student visa processing and a 1 month banking internship. He demonstrates strong communication, client coordination and presentation skills, but the resume lacks quantifiable achievements, advanced technical tools, and industry-specific certifications. The document is moderately ATS-friendly but needs formatting and keyword optimization.",
     atsCompatibility: "Moderate",
     strongestSkills: ["Communication", "Client Coordination", "Data Entry", "CRM (Kondesk & Zoho)", "Presentation"],
     missingOrWeakSkills: ["Advanced Excel", "SQL", "Python", "Financial Modeling", "Regulatory Compliance"],
@@ -157,8 +157,10 @@
     fillList('listSuggestions', window.toList(data.suggestions), 'No suggestions returned.');
     renderChecklist(window.toList(data.recommendedChanges));
 
-    // Persist in session store
-    window.RefineCVSession.save(analysisId, data, 'GENERAL', null, fileName || 'Resume.pdf');
+    // Persist in session store (only for real analyses)
+    if (analysisId && analysisId !== 'demo' && !String(analysisId).startsWith('cmp-') && fileName !== 'Sample_Resume.pdf' && fileName !== 'Uploaded_Resume.pdf') {
+      window.RefineCVSession.save(analysisId, data, 'GENERAL', null, fileName || 'Resume.pdf');
+    }
 
     // ATS meter
     var atsText = data.atsCompatibility || 'Moderate';

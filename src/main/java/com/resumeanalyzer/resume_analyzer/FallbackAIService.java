@@ -200,6 +200,54 @@ public class FallbackAIService implements AIProvider {
         }
     }
 
+    @Override
+    public ResumeComparisonDTO compareResumes(
+            String resumeTextA,
+            String resumeTextB,
+            String jobDescription,
+            String comparisonId,
+            String fileNameA,
+            String fileNameB,
+            Consumer<String> progress
+    ) {
+        return compareResumesWithProvider(resumeTextA, resumeTextB, jobDescription, comparisonId, fileNameA, fileNameB, progress).comparison();
+    }
+
+    @Override
+    public AIComparisonResult compareResumesWithProvider(
+            String resumeTextA,
+            String resumeTextB,
+            String jobDescription,
+            String comparisonId,
+            String fileNameA,
+            String fileNameB,
+            Consumer<String> progress
+    ) {
+        try {
+            ResumeComparisonDTO result = primaryProvider.compareResumes(resumeTextA, resumeTextB, jobDescription, comparisonId, fileNameA, fileNameB, progress);
+            return new AIComparisonResult(result, resolveProviderName(primaryProvider, "gemini"));
+        } catch (Exception e) {
+            if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
+                String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
+                        ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
+                logger.warn("provider={} operation=comparison fallback={} category={}",
+                        resolveProviderName(primaryProvider, "gemini"),
+                        resolveProviderName(fallbackProvider, "groq"),
+                        categoryName);
+                try {
+                    ResumeComparisonDTO fallbackResult = fallbackProvider.compareResumes(resumeTextA, resumeTextB, jobDescription, comparisonId, fileNameA, fileNameB, progress);
+                    logger.info("provider={} operation=comparison success=true", resolveProviderName(fallbackProvider, "groq"));
+                    return new AIComparisonResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                } catch (Exception fallbackEx) {
+                    logger.error("provider={} operation=comparison failed errorType={}",
+                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                    throw fallbackEx;
+                }
+            }
+            throw e;
+        }
+    }
+
     private String resolveProviderName(AIProvider provider, String defaultName) {
         if (provider == null) return defaultName;
         String name = provider.getProviderName();

@@ -292,6 +292,114 @@ public class GeminiService implements AIProvider {
         return AIResponseParser.parseAndValidateImprovement(rawResponse, maxResponseCharacters, objectMapper, "gemini");
     }
 
+    @Override
+    public ResumeComparisonDTO compareResumes(
+            String resumeTextA,
+            String resumeTextB,
+            String jobDescription,
+            String comparisonId,
+            String fileNameA,
+            String fileNameB,
+            Consumer<String> progress
+    ) {
+        if (!isAvailable()) {
+            throw new GeminiCommunicationException("Gemini is not configured.", null);
+        }
+
+        Client client;
+        try {
+            client = Client.builder().apiKey(apiKey).build();
+        } catch (RuntimeException e) {
+            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
+        }
+
+        Schema categorySchema = Schema.builder()
+                .type("OBJECT")
+                .properties(Map.of(
+                        "categoryId", Schema.builder().type("STRING").build(),
+                        "name", Schema.builder().type("STRING").build(),
+                        "maxPoints", Schema.builder().type("INTEGER").build(),
+                        "scoreA", Schema.builder().type("INTEGER").build(),
+                        "scoreB", Schema.builder().type("INTEGER").build(),
+                        "evidenceA", Schema.builder().type("STRING").build(),
+                        "evidenceB", Schema.builder().type("STRING").build(),
+                        "explanationA", Schema.builder().type("STRING").build(),
+                        "explanationB", Schema.builder().type("STRING").build()
+                ))
+                .required(List.of("categoryId", "name", "maxPoints", "scoreA", "scoreB", "evidenceA", "evidenceB", "explanationA", "explanationB"))
+                .build();
+
+        Schema comparisonSchema = Schema.builder()
+                .type("OBJECT")
+                .properties(Map.of(
+                        "jobContext", Schema.builder().type("STRING").build(),
+                        "categories", Schema.builder()
+                                .type("ARRAY")
+                                .items(categorySchema)
+                                .build(),
+                        "keyDifferentiators", Schema.builder()
+                                .type("ARRAY")
+                                .items(Schema.builder().type("STRING").build())
+                                .build(),
+                        "overallTakeaway", Schema.builder().type("STRING").build(),
+                        "resumeABorrowsFromB", Schema.builder()
+                                .type("ARRAY")
+                                .items(Schema.builder().type("STRING").build())
+                                .build(),
+                        "resumeBBorrowsFromA", Schema.builder()
+                                .type("ARRAY")
+                                .items(Schema.builder().type("STRING").build())
+                                .build()
+                ))
+                .required(List.of(
+                        "categories",
+                        "keyDifferentiators",
+                        "overallTakeaway",
+                        "resumeABorrowsFromB",
+                        "resumeBBorrowsFromA"
+                ))
+                .build();
+
+        String prompt = AIPromptBuilder.buildComparisonPrompt(resumeTextA, resumeTextB, jobDescription);
+
+        GenerateContentConfig config = GenerateContentConfig.builder()
+                .responseMimeType("application/json")
+                .responseSchema(comparisonSchema)
+                .build();
+
+        if (progress != null) {
+            progress.accept("comparing");
+        }
+
+        GenerateContentResponse response;
+        try {
+            response = client.models.generateContent(
+                    model,
+                    prompt,
+                    config
+            );
+        } catch (RuntimeException e) {
+            boolean isRateLimit = isRateLimitError(e);
+            throw new GeminiCommunicationException(
+                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini comparison request failed.",
+                    e,
+                    isRateLimit
+            );
+        }
+
+        String result = response == null ? null : response.text();
+        return AIResponseParser.parseAndValidateComparison(
+                result,
+                comparisonId,
+                fileNameA,
+                fileNameB,
+                jobDescription,
+                maxResponseCharacters,
+                objectMapper,
+                "gemini"
+        );
+    }
+
     private static boolean isRateLimitError(Throwable e) {
         if (e == null) return false;
         String message = e.getMessage();

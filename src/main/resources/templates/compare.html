@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compare Resumes | RefineCV</title>
+  <meta name="description" content="Upload two PDF resumes, optionally add a job description, and see which one is stronger and why, category by category.">
+
+  <link rel="icon" type="image/svg+xml" href="/refinecv_brand_assets/svg/refinecv-favicon.svg">
+  <link rel="icon" href="/refinecv_brand_assets/favicon/favicon.ico" sizes="any">
+
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('refinecv-theme');
+        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (dark ? 'dark' : 'light'));
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="/" aria-label="RefineCV home">
+        <span class="brand-word">Refine<span class="brand-cv">CV</span></span>
+      </a>
+
+      <div class="header-right">
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/analyze" class="nav-link">Analyze</a>
+          <a href="/compare" class="nav-link is-active" aria-current="page">Compare</a>
+          <a href="/history" class="nav-link">History</a>
+        </nav>
+
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch theme">
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+
+        <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileNav">
+          <svg class="icon-menu" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <svg class="icon-close" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Drawer -->
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation" hidden>
+      <div class="wrap mobile-nav-inner">
+        <a href="/" class="mobile-nav-link">Home</a>
+        <a href="/#what-you-get" class="mobile-nav-link">What you get</a>
+        <a href="/#how-it-works" class="mobile-nav-link">How it works</a>
+        <a href="/history" class="mobile-nav-link">History</a>
+        <a href="/analyze" class="mobile-nav-link">Analyze Resume</a>
+        <a href="/compare" class="mobile-nav-link mobile-nav-cta is-active" aria-current="page">Compare Resumes &rarr;</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="wrap" style="padding-top: 28px;">
+      <!-- Breadcrumb navigation -->
+      <nav class="page-nav-back" aria-label="Breadcrumb">
+        <a href="/" class="nav-back-link">&larr; Back to Home</a>
+      </nav>
+
+      <!-- Upload View -->
+      <div id="view-upload">
+        <div class="analyze-page-head">
+          <span class="card-eyebrow" style="text-align: center; margin-bottom: 8px;">Side-by-Side Intelligence</span>
+          <h1 class="h-md" style="text-align: center;">Compare Resumes</h1>
+          <p class="lede" style="margin: 12px auto 0; text-align: center;">Compare two resumes and see which is stronger and why, category by category.</p>
+        </div>
+
+        <form class="tool-box compare-tool-box" id="compareForm" novalidate>
+          <!-- Symmetrical 2-Resume Upload Grid -->
+          <div class="compare-upload-grid">
+            <!-- Resume A Slot -->
+            <div class="compare-slot" id="slotA">
+              <div class="compare-slot-header">
+                <span class="slot-pill">Resume A</span>
+                <span class="slot-status" id="statusBadgeA">Awaiting PDF</span>
+              </div>
+
+              <!-- Drop area A -->
+              <div class="drop compare-drop" id="dropA">
+                <input type="file" id="fileInputA" accept="application/pdf,.pdf" class="sr-only" aria-label="Upload Resume A PDF">
+                <label for="fileInputA" class="drop-label">
+                  <svg class="drop-icon" viewBox="0 0 48 48" width="40" height="40" aria-hidden="true"><path d="M12 5h17l9 9v29H12V5Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M29 5v9h9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M24 36V24m0 0-5 5m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span class="drop-text">
+                    <strong id="dropTitleA">Drop Resume A here</strong>
+                    <span>or click to browse</span>
+                  </span>
+                </label>
+              </div>
+
+              <!-- Ready Document Card A -->
+              <div class="doc-card-ready" id="docCardA" hidden>
+                <div class="doc-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </div>
+                <div class="doc-card-details">
+                  <span class="doc-card-name" id="fileNameA">Resume_A.pdf</span>
+                  <span class="doc-card-meta"><span class="badge-ready">PDF &bull; Ready</span> &bull; <span id="fileSizeA">120 KB</span></span>
+                </div>
+                <div class="doc-card-actions">
+                  <button type="button" class="link-btn" id="replaceBtnA">Replace</button>
+                  <button type="button" class="link-btn link-btn-danger" id="removeBtnA">Remove</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Resume B Slot -->
+            <div class="compare-slot" id="slotB">
+              <div class="compare-slot-header">
+                <span class="slot-pill">Resume B</span>
+                <span class="slot-status" id="statusBadgeB">Awaiting PDF</span>
+              </div>
+
+              <!-- Drop area B -->
+              <div class="drop compare-drop" id="dropB">
+                <input type="file" id="fileInputB" accept="application/pdf,.pdf" class="sr-only" aria-label="Upload Resume B PDF">
+                <label for="fileInputB" class="drop-label">
+                  <svg class="drop-icon" viewBox="0 0 48 48" width="40" height="40" aria-hidden="true"><path d="M12 5h17l9 9v29H12V5Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M29 5v9h9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M24 36V24m0 0-5 5m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span class="drop-text">
+                    <strong id="dropTitleB">Drop Resume B here</strong>
+                    <span>or click to browse</span>
+                  </span>
+                </label>
+              </div>
+
+              <!-- Ready Document Card B -->
+              <div class="doc-card-ready" id="docCardB" hidden>
+                <div class="doc-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </div>
+                <div class="doc-card-details">
+                  <span class="doc-card-name" id="fileNameB">Resume_B.pdf</span>
+                  <span class="doc-card-meta"><span class="badge-ready">PDF &bull; Ready</span> &bull; <span id="fileSizeB">120 KB</span></span>
+                </div>
+                <div class="doc-card-actions">
+                  <button type="button" class="link-btn" id="replaceBtnB">Replace</button>
+                  <button type="button" class="link-btn link-btn-danger" id="removeBtnB">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Optional Job Description -->
+          <div class="field compare-jd-field" style="margin-top: 26px;">
+            <div class="field-header">
+              <label for="jobText" class="jd-label">
+                <strong>Optional Job Description</strong>
+                <span class="jd-mode-indicator" id="jdModeIndicator">General comparison mode (no JD)</span>
+              </label>
+              <span class="char-count" id="jdCharCounter">0 / 8000</span>
+            </div>
+            <textarea id="jobText" rows="4" placeholder="Optional: Paste a job posting, requirements, or target role context to compare alignment for a specific job..."></textarea>
+            <p class="hint" style="margin-top: 6px;">Leave empty for a General Comparison. Pasting a role triggers a Job-Specific Comparison automatically.</p>
+          </div>
+
+          <p class="error" id="formError" role="alert" hidden></p>
+
+          <!-- Compare Actions -->
+          <div class="compare-actions-bar">
+            <div class="compare-actions-inner">
+              <button type="submit" class="btn btn-primary" id="compareBtn" disabled>Compare Resumes &rarr;</button>
+              <button type="button" class="btn btn-quiet" id="resetBtn">Reset</button>
+            </div>
+            <span class="compare-guidance" id="compareGuidance">Upload two resumes to continue.</span>
+          </div>
+
+          <p class="privacy" style="margin-top: 20px;">
+            Only upload resumes you have permission to compare. Resumes are processed in private, bounded sessions with zero training retention.
+          </p>
+        </form>
+      </div>
+
+      <!-- Loading View -->
+      <div id="view-loading" class="view" hidden>
+        <section class="loading">
+          <div class="loading-head" style="text-align: center;">
+            <span class="card-eyebrow" style="margin-bottom: 6px;">Comparative Inference</span>
+            <h1 class="h-md" id="loadingTitle">Comparing resumes</h1>
+            <p class="lede" id="loadingFiles" style="margin: 8px auto 0; font-size: 1rem; color: var(--ink-2);"></p>
+          </div>
+          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress"><span id="progressBar"></span></div>
+          <ol class="job-steps" id="jobSteps" aria-live="polite">
+            <li data-step="0"><span class="tick"></span><div><b>Resumes uploaded</b><small>Preparing documents for comparison</small></div></li>
+            <li data-step="1"><span class="tick"></span><div><b>Extracting text & structure</b><small>Reading content from Resume A and Resume B</small></div></li>
+            <li data-step="2"><span class="tick"></span><div><b>Verifying OCR & safety</b><small>Ensuring reliable parsing for both candidates</small></div></li>
+            <li data-step="3"><span class="tick"></span><div><b>Evaluating 6 core categories</b><small>Assessing evidence, experience, and keyword depth</small></div></li>
+            <li data-step="4"><span class="tick"></span><div><b>Writing comparative scorecard</b><small>Computing deterministic scores and takeaways</small></div></li>
+          </ol>
+          <p class="hint" style="text-align: center;">Comparison evaluates both candidates symmetrically to eliminate positional bias.</p>
+          <div class="actions" style="margin-top: 24px; justify-content: center;">
+            <button class="btn btn-quiet btn-sm" type="button" id="cancelBtn">Cancel and go back</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Error View -->
+      <div id="view-error" class="view" hidden>
+        <section class="loading" style="text-align: center;">
+          <h1 class="h-md" id="errorTitle">Comparison could not be completed</h1>
+          <p class="lede" id="errorMessage" style="color: var(--bad); margin: 16px auto 0;"></p>
+          <div class="actions" style="margin-top: 28px; justify-content: center;">
+            <button class="btn btn-primary" type="button" id="retryBtn">Try again</button>
+            <button class="btn btn-quiet" type="button" id="errorBackBtn">Choose other files</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-row">
+      <div class="foot-brand">
+        <div class="foot-brand-text">
+          <div class="foot-brand-title">Refine<span class="brand-cv foot-cv">CV</span></div>
+          <span class="foot-subtitle">resume intelligence</span>
+        </div>
+      </div>
+      <span class="foot-creator">
+        <span>Built by <a href="https://somaiyadhyey250-netizen.github.io/WebTechnology_P5/" target="_blank" rel="noopener">Dhyey Somaiya</a></span>
+        <span class="foot-upgrow" aria-hidden="true"><svg class="upgrow-mark" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 11.5L6.5 7.5L9.5 10.5L14 5M14 5H10.5M14 5V8.5"/></svg></span>
+      </span>
+    </div>
+  </footer>
+
+  <button class="scroll-top" id="scrollTopBtn" type="button" aria-label="Scroll to top" title="Scroll to top">↑</button>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/compare.js"></script>
+</body>
+</html>

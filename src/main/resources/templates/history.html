@@ -33,6 +33,7 @@
         <nav class="site-nav" aria-label="Primary navigation">
           <a href="/" class="nav-link">Home</a>
           <a href="/analyze" class="nav-link">Analyze</a>
+          <a href="/compare" class="nav-link">Compare</a>
           <a href="/history" class="nav-link is-active">History</a>
         </nav>
 
@@ -55,7 +56,8 @@
         <a href="/#what-you-get" class="mobile-nav-link">What you get</a>
         <a href="/#how-it-works" class="mobile-nav-link">How it works</a>
         <a href="/history" class="mobile-nav-link is-active" aria-current="page">History</a>
-        <a href="/analyze" class="mobile-nav-link mobile-nav-cta">Analyze Resume &rarr;</a>
+        <a href="/analyze" class="mobile-nav-link">Analyze Resume</a>
+        <a href="/compare" class="mobile-nav-link mobile-nav-cta">Compare Resumes &rarr;</a>
       </div>
     </nav>
   </header>
@@ -67,10 +69,16 @@
         <a href="/" class="nav-back-link">← Back to Home</a>
       </nav>
 
-      <div style="margin-bottom: 36px;">
-        <span style="font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--pen); font-weight: 700;">V4.6 Architecture Preparation</span>
-        <h1 class="h-md" style="margin-top: 6px;">Session Analysis History</h1>
-        <p class="lede" style="margin: 8px 0 0;">Analyses evaluated during your current browser session. Permanent cloud candidate history will be available in V4.6.</p>
+      <div class="history-page-header">
+        <div class="history-header-titles">
+          <span class="card-eyebrow">Session Records</span>
+          <h1 class="h-md" style="margin-top: 6px;">Session History</h1>
+          <p class="lede" style="margin: 8px 0 0;">Review your recent resume analyses and comparisons from your active session.</p>
+        </div>
+        <div class="history-header-actions">
+          <button type="button" class="btn btn-quiet btn-sm btn-clear-history" id="clearHistoryBtn" aria-haspopup="dialog">Clear History</button>
+          <div id="historyFeedback" class="history-feedback" role="status" aria-live="polite" hidden></div>
+        </div>
       </div>
 
       <!-- History List -->
@@ -79,12 +87,34 @@
       <!-- Empty State -->
       <div id="emptyState" class="tool-box" style="text-align: center; padding: 48px 24px;" hidden>
         <svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true" style="margin: 0 auto 16px; color: var(--ink-3);"><path d="M12 5h17l9 9v29H12V5Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M29 5v9h9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
-        <h2 class="h-sm" style="margin-bottom: 8px;">No recent analyses in this session</h2>
-        <p class="hint" style="max-width: 40ch; margin: 0 auto 24px;">Upload your resume as a PDF to run an evaluation and review strengths, weaknesses, and ATS metrics.</p>
-        <a href="/analyze" class="btn btn-primary">Analyze your resume &rarr;</a>
+        <h2 class="h-sm" style="margin-bottom: 8px;">No history yet</h2>
+        <p class="hint" style="max-width: 48ch; margin: 0 auto 24px;">Your completed analyses and comparisons will appear here.</p>
+        <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+          <a href="/analyze" class="btn btn-primary">Analyze Resume &rarr;</a>
+          <a href="/compare" class="btn btn-quiet">Compare Resumes &rarr;</a>
+        </div>
       </div>
     </div>
   </main>
+
+  <!-- Clear History Confirmation Dialog -->
+  <dialog id="clearConfirmDialog" class="refine-modal" aria-labelledby="clearModalTitle" aria-describedby="clearModalDesc">
+    <div class="refine-modal-content">
+      <div class="refine-modal-header">
+        <span class="card-eyebrow" style="color: var(--bad); margin-bottom: 4px;">Confirm Deletion</span>
+        <h2 id="clearModalTitle" class="h-sm" style="margin: 0;">Clear all history?</h2>
+      </div>
+      <div class="refine-modal-body">
+        <p id="clearModalDesc" class="hint" style="color: var(--ink-2); font-size: .92rem; line-height: 1.5; margin: 0;">
+          This will permanently remove your saved analysis and comparison records from this device/session. This action cannot be undone.
+        </p>
+      </div>
+      <div class="refine-modal-actions">
+        <button type="button" class="btn btn-quiet btn-sm" id="cancelClearBtn">Cancel</button>
+        <button type="button" class="btn btn-clear-confirm btn-sm" id="confirmClearBtn">Clear History</button>
+      </div>
+    </div>
+  </dialog>
 
   <footer class="site-footer">
     <div class="wrap foot-row">

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -178,6 +179,7 @@ public class ResumeController {
         sessionStore.getImprovement(analysisId).ifPresent(imp -> {
             model.addAttribute("improvementResult", imp);
         });
+
         return "improve";
     }
 
@@ -203,10 +205,46 @@ public class ResumeController {
         return "history";
     }
 
+    @GetMapping("/compare")
+    public String comparePage() {
+        return "compare";
+    }
+
+    @GetMapping("/compare/{comparisonId}")
+    public String compareResultPage(@PathVariable("comparisonId") String comparisonId, Model model) {
+        model.addAttribute("comparisonId", comparisonId);
+        sessionStore.getComparison(comparisonId).ifPresent(c -> {
+            model.addAttribute("comparisonResult", c);
+            model.addAttribute("jobDescription", c.jobDescription());
+        });
+        return "compare-result";
+    }
+
     @GetMapping(value = "/api/history", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public java.util.List<HistoryItemDTO> getHistoryApi() {
         return sessionStore.getRecentCompletedSessions();
+    }
+
+    @DeleteMapping(value = "/api/history", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> clearHistoryApi() {
+        try {
+            sessionStore.clearHistory();
+            return ResponseEntity.ok(Map.of("success", true, "message", "History cleared"));
+        } catch (Exception e) {
+            logger.error("Failed to clear history: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "error", "Failed to clear history"));
+        }
+    }
+
+    @GetMapping(value = "/compare/{comparisonId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> getComparisonStatus(@PathVariable("comparisonId") String comparisonId) {
+        return sessionStore.getComparison(comparisonId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
 
@@ -396,8 +434,10 @@ public class ResumeController {
                     status -> sendStatus(emitter, state, status)
             );
             ResumeAnalysisDTO analysis = aiResult.analysis();
-
-            sessionStore.completeSession(state.getAnalysisId(), resumeText, analysis, aiResult.providerName(), effectiveMode, jobDescription);
+            String originalFilename = resume != null && resume.getOriginalFilename() != null && !resume.getOriginalFilename().isBlank()
+                    ? resume.getOriginalFilename()
+                    : "Resume.pdf";
+            sessionStore.completeSession(state.getAnalysisId(), resumeText, analysis, aiResult.providerName(), effectiveMode, jobDescription, originalFilename);
             if (aiResult.providerName() != null && !aiResult.providerName().isBlank()) {
                 sendEvent(emitter, state, "provider", aiResult.providerName());
             }
@@ -494,7 +534,7 @@ public class ResumeController {
 
                             .name(eventName)
 
-                            .data(data, data instanceof ResumeAnalysisDTO
+                            .data(data, (data instanceof ResumeAnalysisDTO || data instanceof ResumeComparisonDTO)
                                     ? MediaType.APPLICATION_JSON
                                     : MediaType.TEXT_PLAIN)
 
@@ -720,6 +760,227 @@ public class ResumeController {
             return ResponseEntity.ok(Map.of("analysisId", analysisId, "status", "CANCELLED"));
         }
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Analysis not found."));
+    }
+
+    /* =========================================
+       RESUME COMPARISON (V4.3)
+    ========================================= */
+
+    @PostMapping(
+            value = "/compare",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    @ResponseBody
+    public SseEmitter compareResumes(
+            @RequestParam(value = "resumeA", required = false)
+            MultipartFile resumeA,
+            @RequestParam(value = "resumeB", required = false)
+            MultipartFile resumeB,
+            @RequestParam(value = "jobDescription", required = false)
+            String jobDescription,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
+        SseEmitter emitter = new SseEmitter(
+                analysisTimeout.plus(sseTimeoutGrace).toMillis()
+        );
+        AnalysisRequestState state = new AnalysisRequestState();
+        if (response != null) {
+            response.setHeader("X-Comparison-Id", state.getAnalysisId());
+        }
+        activeRequests.put(state.getAnalysisId(), state);
+
+        logger.info("comparison_request_started comparisonId={} fileA={} fileB={}",
+                state.getAnalysisId(),
+                resumeA == null ? 0 : resumeA.getSize(),
+                resumeB == null ? 0 : resumeB.getSize());
+
+        if (!rateLimiter.tryAcquire(request.getRemoteAddr())) {
+            logger.warn("comparison_request_rejected comparisonId={} category={}",
+                    state.getAnalysisId(), AnalysisErrorMessages.Category.RATE_LIMITED);
+            finishError(emitter, state,
+                    AnalysisErrorMessages.forCategory(AnalysisErrorMessages.Category.RATE_LIMITED));
+            return emitter;
+        }
+
+        try {
+            if (resumeA == null || resumeA.isEmpty() || resumeB == null || resumeB.isEmpty()) {
+                throw new ResumeValidationException(ResumeValidationException.Reason.INVALID_UPLOAD);
+            }
+            validateUpload(resumeA);
+            validateUpload(resumeB);
+
+            if (jobDescription != null && jobDescription.strip().length() > JD_MAX_LENGTH) {
+                throw new ResumeValidationException(ResumeValidationException.Reason.JOB_DESCRIPTION_TOO_LONG);
+            }
+
+            final String resolvedJobDesc = (jobDescription != null && !jobDescription.isBlank())
+                    ? jobDescription.strip()
+                    : null;
+
+            Future<?> task = analysisExecutor.submit(() -> runComparison(resumeA, resumeB, emitter, state, resolvedJobDesc));
+            state.setTask(task);
+
+            ScheduledFuture<?> timeout = timeoutScheduler.schedule(
+                    () -> handleTimeout(emitter, state),
+                    Instant.now().plus(analysisTimeout)
+            );
+            if (timeout != null) {
+                state.setTimeout(timeout);
+            }
+        } catch (ResumeValidationException e) {
+            logger.warn("comparison_request_rejected comparisonId={} reason={}",
+                    state.getAnalysisId(), e.getReason());
+            finishError(emitter, state, AnalysisErrorMessages.forException(e));
+        } catch (RejectedExecutionException e) {
+            logger.warn("comparison_request_rejected comparisonId={} category={}",
+                    state.getAnalysisId(), AnalysisErrorMessages.Category.BUSY);
+            finishError(emitter, state, AnalysisErrorMessages.forCategory(AnalysisErrorMessages.Category.BUSY));
+        } catch (RuntimeException e) {
+            logger.error("comparison_start_failed comparisonId={} errorType={}",
+                    state.getAnalysisId(), e.getClass().getName());
+            state.cancel();
+            finishError(emitter, state, AnalysisErrorMessages.forCategory(AnalysisErrorMessages.Category.INTERNAL));
+        }
+
+        return emitter;
+    }
+
+    void runComparison(
+            MultipartFile fileA,
+            MultipartFile fileB,
+            SseEmitter emitter,
+            AnalysisRequestState state,
+            String jobDescription
+    ) {
+        final String comparisonId = state.getAnalysisId();
+        MDC.put("analysisId", comparisonId);
+        final String nameA = (fileA.getOriginalFilename() != null && !fileA.getOriginalFilename().isBlank())
+                ? fileA.getOriginalFilename() : "Resume A.pdf";
+        final String nameB = (fileB.getOriginalFilename() != null && !fileB.getOriginalFilename().isBlank())
+                ? fileB.getOriginalFilename() : "Resume B.pdf";
+
+        logger.info("comparison_started comparisonId={} fileA={} fileB={}", comparisonId, nameA, nameB);
+        try {
+            state.checkActive();
+            sendEvent(emitter, state, "comparison-id", comparisonId);
+            sendStatus(emitter, state, "upload");
+
+            byte[] bytesA = fileA.getBytes();
+            byte[] bytesB = fileB.getBytes();
+            state.checkActive();
+
+            sendStatus(emitter, state, "extracting_a");
+            String textA = null;
+            try {
+                textA = resumeTextExtractor.extractText(bytesA, status -> sendStatus(emitter, state, "extracting_a"));
+            } catch (Exception e) {
+                logger.warn("comparison_extraction_failed_a comparisonId={}", comparisonId);
+            }
+
+            state.checkActive();
+
+            sendStatus(emitter, state, "extracting_b");
+            String textB = null;
+            try {
+                textB = resumeTextExtractor.extractText(bytesB, status -> sendStatus(emitter, state, "extracting_b"));
+            } catch (Exception e) {
+                logger.warn("comparison_extraction_failed_b comparisonId={}", comparisonId);
+            }
+
+            state.checkActive();
+
+            boolean unreadableA = textA == null || textA.strip().length() < 50;
+            boolean unreadableB = textB == null || textB.strip().length() < 50;
+            if (unreadableA || unreadableB) {
+                String reason;
+                if (unreadableA && unreadableB) {
+                    reason = "Both Resume A and Resume B could not be reliably read";
+                } else if (unreadableA) {
+                    reason = "Resume A (" + nameA + ") could not be reliably read";
+                } else {
+                    reason = "Resume B (" + nameB + ") could not be reliably read";
+                }
+                ResumeComparisonDTO unreadableDto = ResumeComparisonDTO.forUnreadable(
+                        comparisonId, nameA, nameB, reason, jobDescription);
+                sessionStore.saveComparison(unreadableDto);
+                sendEvent(emitter, state, "result", unreadableDto);
+                emitter.complete();
+                logger.info("comparison_unreadable comparisonId={}", comparisonId);
+                return;
+            }
+
+            String normA = textA.replaceAll("\\s+", " ").trim().toLowerCase();
+            String normB = textB.replaceAll("\\s+", " ").trim().toLowerCase();
+            if (normA.equals(normB)) {
+                ResumeComparisonDTO identicalDto = ResumeComparisonDTO.forIdentical(
+                        comparisonId, nameA, nameB, jobDescription);
+                sessionStore.saveComparison(identicalDto);
+                sendEvent(emitter, state, "result", identicalDto);
+                emitter.complete();
+                logger.info("comparison_identical comparisonId={}", comparisonId);
+                return;
+            }
+
+            sendStatus(emitter, state, "comparing");
+            AIComparisonResult aiResult = aiProvider.compareResumesWithProvider(
+                    textA, textB, jobDescription, comparisonId, nameA, nameB,
+                    status -> sendStatus(emitter, state, status)
+            );
+
+            ResumeComparisonDTO rawComparison = aiResult.comparison();
+
+            ResumeComparisonDTO finalComparison = new ResumeComparisonDTO(
+                    rawComparison.comparisonId(),
+                    rawComparison.fileNameA(),
+                    rawComparison.fileNameB(),
+                    rawComparison.totalScoreA(),
+                    rawComparison.totalScoreB(),
+                    rawComparison.scoreDifference(),
+                    rawComparison.winner(),
+                    rawComparison.verdictTitle(),
+                    rawComparison.verdictExplanation(),
+                    rawComparison.keyDifferentiators(),
+                    rawComparison.categories(),
+                    rawComparison.overallTakeaway(),
+                    rawComparison.resumeABorrowsFromB(),
+                    rawComparison.resumeBBorrowsFromA(),
+                    false,
+                    false,
+                    null,
+                    rawComparison.jobDescription(),
+                    rawComparison.jobContext(),
+                    null,
+                    null,
+                    aiResult.providerName(),
+                    rawComparison.createdAt()
+            );
+
+            sessionStore.saveComparison(finalComparison);
+
+            if (aiResult.providerName() != null && !aiResult.providerName().isBlank()) {
+                sendEvent(emitter, state, "provider", aiResult.providerName());
+            }
+            sendEvent(emitter, state, "result", finalComparison);
+            emitter.complete();
+            logger.info("comparison_succeeded comparisonId={} provider={} durationMs={}",
+                    comparisonId, aiResult.providerName(), state.elapsedMillis());
+
+        } catch (CancellationException e) {
+            logger.info("comparison_cancelled comparisonId={} durationMs={}", comparisonId, state.elapsedMillis());
+            finishError(emitter, state, AnalysisErrorMessages.forException(e));
+        } catch (Exception e) {
+            if (state.isCancelled() || Thread.currentThread().isInterrupted()) {
+                return;
+            }
+            logger.error("comparison_failed comparisonId={} errorType={} durationMs={}",
+                    comparisonId, e.getClass().getName(), state.elapsedMillis());
+            finishError(emitter, state, AnalysisErrorMessages.forCategory(AnalysisErrorMessages.Category.INTERNAL));
+        } finally {
+            activeRequests.remove(comparisonId);
+            state.cancelTimeout();
+            MDC.remove("analysisId");
+        }
     }
 
     AnalysisSessionStore getSessionStore() {

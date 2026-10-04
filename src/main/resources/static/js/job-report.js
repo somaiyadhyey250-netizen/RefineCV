@@ -78,8 +78,10 @@
     fillList('listWeaknesses', window.toList(data.weaknesses), 'None identified');
     fillList('listSuggestions', window.toList(data.suggestions), 'No recommendations returned.');
 
-    // Save session
-    window.RefineCVSession.save(analysisId, data, 'SPECIFIC_JOB', contextText, fileName || 'Resume.pdf');
+    // Save session (only for real analyses)
+    if (analysisId && analysisId !== 'demo' && !String(analysisId).startsWith('cmp-') && fileName !== 'Sample_Resume.pdf' && fileName !== 'Uploaded_Resume.pdf') {
+      window.RefineCVSession.save(analysisId, data, 'SPECIFIC_JOB', contextText, fileName || 'Resume.pdf');
+    }
 
     // Ruler fill animation
     if ($('rulerFill')) $('rulerFill').style.width = '0%';

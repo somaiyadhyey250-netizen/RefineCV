@@ -33,6 +33,7 @@
         <nav class="site-nav" aria-label="Primary navigation">
           <a href="/" class="nav-link">Home</a>
           <a href="/analyze" class="nav-link">Analyze</a>
+          <a href="/compare" class="nav-link">Compare</a>
           <a href="/history" class="nav-link">History</a>
         </nav>
 
@@ -55,47 +56,52 @@
         <a href="/#what-you-get" class="mobile-nav-link">What you get</a>
         <a href="/#how-it-works" class="mobile-nav-link">How it works</a>
         <a href="/history" class="mobile-nav-link">History</a>
-        <a href="/analyze" class="mobile-nav-link mobile-nav-cta">Analyze Resume &rarr;</a>
+        <a href="/analyze" class="mobile-nav-link">Analyze Resume</a>
+        <a href="/compare" class="mobile-nav-link mobile-nav-cta">Compare Resumes &rarr;</a>
       </div>
     </nav>
   </header>
 
   <main id="main">
     <div class="wrap" style="padding-top: 24px; padding-bottom: 0;">
-      <!-- Breadcrumb Navigation -->
+      <!-- Single Clean Breadcrumb Navigation (No Duplication) -->
       <nav class="page-nav-back" aria-label="Breadcrumb">
-        <a th:href="${mode == 'SPECIFIC_JOB' ? '/job-analysis/' + analysisId : '/analysis/' + analysisId}" class="nav-back-link" id="topBackToAnalysisLink">← Back to Analysis</a>
+        <a th:href="${mode == 'SPECIFIC_JOB' ? '/job-analysis/' + analysisId : '/analysis/' + analysisId}" class="nav-back-link" id="topBackLink">← Back to Analysis</a>
       </nav>
     </div>
 
     <div class="wrap report" style="padding-top: 0;">
       <!-- Left Rail Navigation -->
       <aside class="rail" aria-label="Refinement actions">
-        <p class="rail-file">Refinement Workspace</p>
+        <p class="rail-file" id="railFileName">Refinement Workspace</p>
         <div class="rail-actions" style="margin-top: 0;">
-          <button class="btn btn-primary btn-sm" type="button" id="copyAllBtn">Copy all improvements</button>
-          <a th:href="${mode == 'SPECIFIC_JOB' ? '/job-analysis/' + analysisId : '/analysis/' + analysisId}" class="btn btn-quiet btn-sm" id="backToReportBtn">← Back to Analysis</a>
+          <button class="btn btn-primary btn-sm" type="button" id="copyAllBtn" hidden>Copy all improvements</button>
           <a href="/analyze" class="btn btn-quiet btn-sm">Analyze Another Resume</a>
         </div>
       </aside>
 
       <!-- Main Document Paper Sheet -->
       <article class="doc">
-        <!-- Loading State -->
-        <div id="loadingState" class="loading" style="padding-top: 32px; padding-bottom: 32px;" hidden>
+        <!-- Loading State: Clean, focused, no completed-state action buttons -->
+        <div id="loadingState" class="loading" style="padding-top: 36px; padding-bottom: 36px;" hidden>
           <div class="loading-head">
-            <h1 class="h-md">Crafting resume enhancements</h1>
-            <p class="lede">Analyzing bullet points and generating metric-focused active phrasing without inventing facts.</p>
+            <span class="card-eyebrow" id="loadingEyebrow">Refinement Workspace</span>
+            <h1 class="h-md" id="loadingTitle">Crafting resume enhancements</h1>
+            <p class="lede" id="loadingDesc">Analyzing bullet points and generating metric-focused active phrasing without inventing facts.</p>
           </div>
           <div class="progress" style="margin-top: 24px;"><span style="width: 70%; animation: pulse 1.5s infinite;"></span></div>
           <p class="hint">This usually takes 10 to 20 seconds.</p>
+          <div class="loading-actions" style="margin-top: 24px; display: flex; justify-content: center;">
+            <a th:href="${mode == 'SPECIFIC_JOB' ? '/job-analysis/' + analysisId : '/analysis/' + analysisId}" class="btn btn-quiet btn-sm" id="loadingBackBtn">← Back to Analysis</a>
+          </div>
         </div>
 
         <!-- Content State -->
         <div id="contentState">
           <header class="refine-header">
-            <h1 class="h-md">Refined Resume Enhancements</h1>
-            <p class="lede" style="margin: 10px 0 0;">Action-oriented, fact-grounded rewrites derived strictly from your uploaded resume.</p>
+            <span class="card-eyebrow" id="improveEyebrow">Refinement Workspace</span>
+            <h1 class="h-md" id="improveTitle">Refined Resume Enhancements</h1>
+            <p class="lede" id="improveLede" style="margin: 10px 0 0;">Action-oriented, fact-grounded rewrites derived strictly from your uploaded resume.</p>
             <p class="refine-note">Review AI-generated changes for accuracy before incorporating them into your official resume.</p>
           </header>
 
@@ -124,7 +130,7 @@
           </section>
 
           <footer class="doc-foot">
-            <button class="btn btn-primary" type="button" onclick="document.getElementById('copyAllBtn').click()">Copy all improvements</button>
+            <button class="btn btn-primary" type="button" id="bottomCopyAllBtn" onclick="document.getElementById('copyAllBtn').click()">Copy all improvements</button>
             <a th:href="${mode == 'SPECIFIC_JOB' ? '/job-analysis/' + analysisId : '/analysis/' + analysisId}" class="btn btn-quiet" id="bottomBackToReportBtn">← Back to Analysis</a>
             <a href="/analyze" class="btn btn-quiet">Analyze Another Resume</a>
           </footer>

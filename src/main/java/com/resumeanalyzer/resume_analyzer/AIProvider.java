@@ -56,4 +56,31 @@ public interface AIProvider {
         }
         return improveResumeWithProvider(resumeText, analysis);
     }
+
+    /** Performs resume comparison between Candidate A and Candidate B with optional job description. */
+    default ResumeComparisonDTO compareResumes(
+            String resumeTextA,
+            String resumeTextB,
+            String jobDescription,
+            String comparisonId,
+            String fileNameA,
+            String fileNameB,
+            Consumer<String> progress
+    ) {
+        throw new UnsupportedOperationException("Resume comparison not supported by provider " + getProviderName());
+    }
+
+    /** Performs resume comparison and returns the result along with the provider name that generated it. */
+    default AIComparisonResult compareResumesWithProvider(
+            String resumeTextA,
+            String resumeTextB,
+            String jobDescription,
+            String comparisonId,
+            String fileNameA,
+            String fileNameB,
+            Consumer<String> progress
+    ) {
+        ResumeComparisonDTO dto = compareResumes(resumeTextA, resumeTextB, jobDescription, comparisonId, fileNameA, fileNameB, progress);
+        return new AIComparisonResult(dto, getProviderName());
+    }
 }

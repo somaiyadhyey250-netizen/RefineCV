@@ -249,7 +249,8 @@ public class GroqAIProvider implements AIProvider {
                         boolean isValidGeneral = parsedTree.has("score") && parsedTree.has("summary") && parsedTree.has("strongestSkills");
                         boolean isValidImprovement = parsedTree.has("improvedSummary") && parsedTree.has("bulletImprovements");
                         boolean isValidJobMatch = parsedTree.has("jobMatchScore") && parsedTree.has("matchingSkills") && parsedTree.has("experienceAlignment");
-                        if (parsedTree.isObject() && (isValidGeneral || isValidImprovement || isValidJobMatch)) {
+                        boolean isValidComparison = parsedTree.has("categories") && parsedTree.has("overallTakeaway");
+                        if (parsedTree.isObject() && (isValidGeneral || isValidImprovement || isValidJobMatch || isValidComparison)) {
                             logger.info("provider=groq operation={} recovered_from=failed_generation durationMs={}", operation, duration);
                             return clean;
                         }
@@ -384,6 +385,94 @@ public class GroqAIProvider implements AIProvider {
                         "actionableChanges", Map.of("type", "array", "items", Map.of("type", "string"))
                 ),
                 "required", List.of("improvedSummary", "bulletImprovements", "improvementExplanations", "actionableChanges"),
+                "additionalProperties", false
+        );
+    }
+
+    @Override
+    public ResumeComparisonDTO compareResumes(
+            String resumeTextA,
+            String resumeTextB,
+            String jobDescription,
+            String comparisonId,
+            String fileNameA,
+            String fileNameB,
+            Consumer<String> progress
+    ) {
+        if (!isAvailable()) {
+            throw new AICommunicationException(getProviderName(), AIErrorCategory.AUTHENTICATION_FAILURE,
+                    "Groq is not configured with an API key.", false, null);
+        }
+
+        String prompt = AIPromptBuilder.buildComparisonPrompt(resumeTextA, resumeTextB, jobDescription);
+
+        Map<String, Object> requestBody = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", "You are an expert AI Resume Evaluator. Output strictly valid JSON matching the schema. Do not output markdown code fences or conversational text."),
+                        Map.of("role", "user", "content", prompt)
+                ),
+                "response_format", Map.of(
+                        "type", "json_schema",
+                        "json_schema", Map.of(
+                                "name", "resume_comparison",
+                                "strict", true,
+                                "schema", buildComparisonJsonSchema()
+                        )
+                ),
+                "temperature", 0.2,
+                "max_completion_tokens", 8192,
+                "reasoning_format", "parsed"
+        );
+
+        if (progress != null) {
+            progress.accept("comparing");
+        }
+
+        String responseContent = executeChatCompletion(requestBody, "comparison");
+
+        return AIResponseParser.parseAndValidateComparison(
+                responseContent,
+                comparisonId,
+                fileNameA,
+                fileNameB,
+                jobDescription,
+                maxResponseCharacters,
+                objectMapper,
+                getProviderName()
+        );
+    }
+
+    private Map<String, Object> buildComparisonJsonSchema() {
+        Map<String, Object> categoryItem = Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "categoryId", Map.of("type", "string"),
+                        "name", Map.of("type", "string"),
+                        "maxPoints", Map.of("type", "integer"),
+                        "scoreA", Map.of("type", "integer"),
+                        "scoreB", Map.of("type", "integer"),
+                        "evidenceA", Map.of("type", "string"),
+                        "evidenceB", Map.of("type", "string"),
+                        "explanationA", Map.of("type", "string"),
+                        "explanationB", Map.of("type", "string")
+                ),
+                "required", List.of("categoryId", "name", "maxPoints", "scoreA", "scoreB", "evidenceA", "evidenceB", "explanationA", "explanationB"),
+                "additionalProperties", false
+        );
+
+        var properties = new java.util.HashMap<String, Object>();
+        properties.put("jobContext", Map.of("type", "string"));
+        properties.put("categories", Map.of("type", "array", "items", categoryItem));
+        properties.put("keyDifferentiators", Map.of("type", "array", "items", Map.of("type", "string")));
+        properties.put("overallTakeaway", Map.of("type", "string"));
+        properties.put("resumeABorrowsFromB", Map.of("type", "array", "items", Map.of("type", "string")));
+        properties.put("resumeBBorrowsFromA", Map.of("type", "array", "items", Map.of("type", "string")));
+
+        return Map.of(
+                "type", "object",
+                "properties", properties,
+                "required", List.of("jobContext", "categories", "keyDifferentiators", "overallTakeaway", "resumeABorrowsFromB", "resumeBBorrowsFromA"),
                 "additionalProperties", false
         );
     }

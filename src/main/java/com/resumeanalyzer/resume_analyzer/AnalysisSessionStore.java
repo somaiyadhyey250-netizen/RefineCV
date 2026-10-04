@@ -39,6 +39,7 @@ public class AnalysisSessionStore {
         private volatile String provider;
         private volatile AnalysisMode mode;
         private volatile String jobDescription;
+        private volatile String fileName;
         private volatile String error;
         private volatile ResumeImprovementDTO improvement;
         private final Instant createdAt;
@@ -46,12 +47,18 @@ public class AnalysisSessionStore {
 
         public FullSession(String analysisId, AnalysisStatus status, String stage,
                            String resumeText, ResumeAnalysisDTO analysis, String provider, String error) {
-            this(analysisId, status, stage, resumeText, analysis, provider, AnalysisMode.GENERAL, null, error);
+            this(analysisId, status, stage, resumeText, analysis, provider, AnalysisMode.GENERAL, null, "Resume.pdf", error);
         }
 
         public FullSession(String analysisId, AnalysisStatus status, String stage,
                            String resumeText, ResumeAnalysisDTO analysis, String provider,
                            AnalysisMode mode, String jobDescription, String error) {
+            this(analysisId, status, stage, resumeText, analysis, provider, mode, jobDescription, "Resume.pdf", error);
+        }
+
+        public FullSession(String analysisId, AnalysisStatus status, String stage,
+                           String resumeText, ResumeAnalysisDTO analysis, String provider,
+                           AnalysisMode mode, String jobDescription, String fileName, String error) {
             this.analysisId = analysisId;
             this.status = status;
             this.stage = stage;
@@ -60,6 +67,7 @@ public class AnalysisSessionStore {
             this.provider = provider;
             this.mode = mode != null ? mode : AnalysisMode.GENERAL;
             this.jobDescription = jobDescription;
+            this.fileName = fileName != null && !fileName.isBlank() ? fileName : "Resume.pdf";
             this.error = error;
             this.createdAt = Instant.now();
             this.updatedAt = this.createdAt;
@@ -73,6 +81,8 @@ public class AnalysisSessionStore {
         public String getProvider() { return provider; }
         public AnalysisMode getMode() { return mode; }
         public String getJobDescription() { return jobDescription; }
+        public String getFileName() { return fileName; }
+        public void setFileName(String fileName) { this.fileName = fileName; }
         public String getError() { return error; }
         public ResumeImprovementDTO getImprovement() { return improvement; }
         public void setImprovement(ResumeImprovementDTO improvement) {
@@ -87,19 +97,26 @@ public class AnalysisSessionStore {
             this.updatedAt = Instant.now();
         }
 
-        public void complete(String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription) {
+        public void complete(String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription, String fileName) {
             this.resumeText = resumeText;
             this.analysis = analysis;
             this.provider = provider;
             this.mode = mode != null ? mode : AnalysisMode.GENERAL;
             this.jobDescription = jobDescription;
+            if (fileName != null && !fileName.isBlank()) {
+                this.fileName = fileName;
+            }
             this.status = AnalysisStatus.COMPLETED;
             this.stage = "completed";
             this.updatedAt = Instant.now();
         }
 
+        public void complete(String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription) {
+            complete(resumeText, analysis, provider, mode, jobDescription, this.fileName);
+        }
+
         public void complete(String resumeText, ResumeAnalysisDTO analysis, String provider) {
-            complete(resumeText, analysis, provider, AnalysisMode.GENERAL, null);
+            complete(resumeText, analysis, provider, AnalysisMode.GENERAL, null, this.fileName);
         }
 
         public void fail(String error) {
@@ -125,6 +142,7 @@ public class AnalysisSessionStore {
     }
 
     private final Map<String, FullSession> sessions = new ConcurrentHashMap<>();
+    private final Map<String, ResumeComparisonDTO> comparisons = new ConcurrentHashMap<>();
     private final long ttlMillis;
     private final int maxSessions;
 
@@ -154,16 +172,20 @@ public class AnalysisSessionStore {
         }
     }
 
-    public void completeSession(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription) {
+    public void completeSession(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription, String fileName) {
         if (analysisId == null || analysisId.isBlank()) return;
         cleanExpired();
         FullSession session = sessions.computeIfAbsent(analysisId,
-                id -> new FullSession(id, AnalysisStatus.COMPLETED, "completed", resumeText, analysis, provider, mode, jobDescription, null));
-        session.complete(resumeText, analysis, provider, mode, jobDescription);
+                id -> new FullSession(id, AnalysisStatus.COMPLETED, "completed", resumeText, analysis, provider, mode, jobDescription, fileName, null));
+        session.complete(resumeText, analysis, provider, mode, jobDescription, fileName);
+    }
+
+    public void completeSession(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription) {
+        completeSession(analysisId, resumeText, analysis, provider, mode, jobDescription, "Resume.pdf");
     }
 
     public void completeSession(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider) {
-        completeSession(analysisId, resumeText, analysis, provider, AnalysisMode.GENERAL, null);
+        completeSession(analysisId, resumeText, analysis, provider, AnalysisMode.GENERAL, null, "Resume.pdf");
     }
 
     public void save(String analysisId, String resumeText, ResumeAnalysisDTO analysis, String provider, AnalysisMode mode, String jobDescription) {
@@ -248,24 +270,98 @@ public class AnalysisSessionStore {
         }
     }
 
+    public void saveComparison(ResumeComparisonDTO comparison) {
+        if (comparison == null || comparison.comparisonId() == null || comparison.comparisonId().isBlank()) return;
+        ensureCapacity();
+        comparisons.put(comparison.comparisonId(), comparison);
+    }
+
+    public Optional<ResumeComparisonDTO> getComparison(String comparisonId) {
+        if (comparisonId == null || comparisonId.isBlank()) return Optional.empty();
+        ResumeComparisonDTO comp = comparisons.get(comparisonId);
+        if (comp == null) return Optional.empty();
+        Instant createdAt;
+        try {
+            createdAt = Instant.parse(comp.createdAt());
+        } catch (Exception e) {
+            createdAt = Instant.now();
+        }
+        if (Duration.between(createdAt, Instant.now()).toMillis() > ttlMillis) {
+            comparisons.remove(comparisonId);
+            return Optional.empty();
+        }
+        return Optional.of(comp);
+    }
+
     public java.util.List<HistoryItemDTO> getRecentCompletedSessions() {
         cleanExpired();
-        return sessions.values().stream()
-                .filter(s -> s.getStatus() == AnalysisStatus.COMPLETED && s.getAnalysis() != null)
-                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-                .limit(20)
-                .map(s -> new HistoryItemDTO(
+        java.util.List<HistoryItemDTO> list = new java.util.ArrayList<>();
+
+        for (FullSession s : sessions.values()) {
+            if (s.getStatus() == AnalysisStatus.COMPLETED && s.getAnalysis() != null) {
+                if (s.getAnalysisId() == null || s.getAnalysisId().startsWith("cmp-") || "demo".equalsIgnoreCase(s.getAnalysisId())) {
+                    continue;
+                }
+                list.add(new HistoryItemDTO(
                         s.getAnalysisId(),
                         s.getMode() != null ? s.getMode().name() : "GENERAL",
-                        "Resume.pdf",
+                        s.getFileName() != null && !s.getFileName().isBlank() ? s.getFileName() : "Resume.pdf",
                         s.getAnalysis() != null ? s.getAnalysis().score() : 0,
-                        s.getCreatedAt().toString()
-                ))
-                .toList();
+                        s.getCreatedAt().toString(),
+                        "ANALYSIS",
+                        null,
+                        null,
+                        null,
+                        null
+                ));
+            }
+        }
+
+        for (ResumeComparisonDTO comp : comparisons.values()) {
+            if (comp.comparisonId() == null || "demo".equalsIgnoreCase(comp.comparisonId())) {
+                continue;
+            }
+            String modeStr = comp.jobDescription() != null && !comp.jobDescription().isBlank()
+                    ? "SPECIFIC_JOB" : "GENERAL";
+            list.add(new HistoryItemDTO(
+                    comp.comparisonId(),
+                    modeStr,
+                    comp.fileNameA(),
+                    comp.totalScoreA(),
+                    comp.createdAt(),
+                    "COMPARE",
+                    comp.fileNameB(),
+                    comp.totalScoreB(),
+                    comp.verdictTitle(),
+                    comp.jobContext() != null && !comp.jobContext().isBlank() ? comp.jobContext() : comp.jobDescription()
+            ));
+        }
+
+        list.sort((a, b) -> b.createdAt().compareTo(a.createdAt()));
+        if (list.size() > 20) {
+            return list.subList(0, 20);
+        }
+        return list;
     }
 
     public void clear() {
         sessions.clear();
+        comparisons.clear();
+    }
+
+    /**
+     * Clears user-visible history records (completed sessions and comparisons).
+     * Active processing sessions are preserved.
+     */
+    public void clearHistory() {
+        sessions.entrySet().removeIf(entry -> {
+            FullSession s = entry.getValue();
+            return s != null && s.getStatus() == AnalysisStatus.COMPLETED && !"demo".equalsIgnoreCase(s.getAnalysisId());
+        });
+        comparisons.entrySet().removeIf(entry -> {
+            ResumeComparisonDTO comp = entry.getValue();
+            return comp == null || !"demo".equalsIgnoreCase(comp.comparisonId());
+        });
     }
 
     private void ensureCapacity() {
@@ -275,11 +371,25 @@ public class AnalysisSessionStore {
                 sessions.remove(it.next());
             }
         }
+        if (comparisons.size() >= maxSessions) {
+            Iterator<String> it = comparisons.keySet().iterator();
+            if (it.hasNext()) {
+                comparisons.remove(it.next());
+            }
+        }
     }
 
     private void cleanExpired() {
         Instant now = Instant.now();
         sessions.entrySet().removeIf(entry ->
                 Duration.between(entry.getValue().getCreatedAt(), now).toMillis() > ttlMillis);
+        comparisons.entrySet().removeIf(entry -> {
+            try {
+                Instant created = Instant.parse(entry.getValue().createdAt());
+                return Duration.between(created, now).toMillis() > ttlMillis;
+            } catch (Exception e) {
+                return false;
+            }
+        });
     }
 }

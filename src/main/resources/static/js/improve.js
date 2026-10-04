@@ -10,31 +10,31 @@
   var $ = function (id) { return document.getElementById(id); };
 
   var DEMO_IMPROVEMENT = {
-    improvedSummary: "Backend Software Engineer with demonstrated experience delivering scalable Java and Spring Boot microservices. Proven track record of optimizing PostgreSQL queries for high-volume data workloads, designing high-throughput REST APIs, and adhering to strict transaction reliability and security principles. Prepared to transition proven engineering skills into high-compliance banking systems.",
+    improvedSummary: "Dedicated professional with demonstrated experience in client coordination, student administration workflows, and digital records management. Proven ability to streamline document intake, maintain data accuracy across CRM platforms, and facilitate effective multi-stakeholder communication.",
     bulletImprovements: [
       {
         section: "Work Experience",
-        originalBullet: "Architected REST APIs in Java and Spring Boot, reducing p99 response times by 35%.",
-        improvedBullet: "Architected high-throughput REST APIs using Java and Spring Boot, reducing p99 response times by 35% and enhancing transaction reliability for high-volume banking workloads.",
-        explanation: "Emphasizes performance and reliability metrics that resonate directly with banking compliance and latency demands."
+        originalBullet: "Handled student visa applications and coordinated with international clients.",
+        improvedBullet: "Managed end-to-end student visa intake workflows, conducting initial document reviews and coordinating client communications across partner institutions.",
+        explanation: "Replaces passive 'handled' with an active operational verb and clarifies the scope of responsibility without inventing unsupported metrics."
       },
       {
         section: "Work Experience",
-        originalBullet: "Optimized SQL queries and indexed high-volume database tables for 2M daily transactions.",
-        improvedBullet: "Optimized complex SQL queries and applied strategic indexing on PostgreSQL tables handling 2 million daily transactions, boosting query efficiency and supporting zero-downtime ledger processing.",
-        explanation: "Highlights system scale and transaction integrity, validating candidate readiness for mission-critical financial applications."
+        originalBullet: "Used Kondesk and Zoho CRM to keep track of student records.",
+        improvedBullet: "Maintained accurate applicant profiles and communication logs within Kondesk and Zoho CRM, ensuring timely status tracking across active cases.",
+        explanation: "Emphasizes record precision and proactive workflow tracking grounded strictly in the source tools."
       },
       {
-        section: "Projects",
-        originalBullet: "Implemented asynchronous messaging with RabbitMQ to decouple microservices.",
-        improvedBullet: "Engineered fault-tolerant asynchronous messaging pipeline with RabbitMQ, decoupling microservices and ensuring guaranteed message delivery during traffic spikes.",
-        explanation: "Focuses on fault-tolerance and guaranteed delivery, crucial indicators of enterprise architecture maturity."
+        section: "Work Experience",
+        originalBullet: "Assisted senior counselors with presentation and documentation.",
+        improvedBullet: "Collaborated with senior advising staff to prepare candidate orientation briefings and assemble required regulatory visa filings.",
+        explanation: "Clarifies specific deliverables and strengthens professional tone based on source responsibilities."
       }
     ],
     actionableChanges: [
-      "Replace passive opener 'Responsible for' with active impact verbs (Architected, Engineered, Optimized).",
-      "Quantify database transaction throughput to substantiate scalability claims.",
-      "Frame architectural decisions around reliability and data integrity metrics."
+      "Replace generic duty verbs (Handled, Used) with active operational verbs (Managed, Maintained, Collaborated).",
+      "Document specific application volume numbers if verifiable records are available.",
+      "Highlight specific software workflows (CRM logging, verification checklists) already performed in past roles."
     ]
   };
 
@@ -138,20 +138,48 @@
       });
     }
 
+    // Reveal Copy All controls once improvements are available
+    var copyBtn = $('copyAllBtn');
+    if (copyBtn) copyBtn.hidden = false;
+    var bottomCopy = $('bottomCopyAllBtn');
+    if (bottomCopy) bottomCopy.hidden = false;
+  }
+
+  function renderImprovementError(message) {
+    if ($('summaryText')) {
+      $('summaryText').textContent = 'Unable to safely generate improvements from this session evidence.';
+    }
+    var makeoversContainer = $('makeoversList');
+    if (makeoversContainer) {
+      makeoversContainer.innerHTML = `
+        <div class="report-card" style="padding: 24px; text-align: center; border: 1px solid var(--border-subtle);">
+          <p style="color: var(--ink-2); font-weight: 500; margin-bottom: 8px;">${window.escapeHTML(message)}</p>
+          <p class="hint">Cannot safely strengthen or rewrite claims without additional verifiable evidence.</p>
+        </div>
+      `;
+    }
+    var actionsUl = $('actionsList');
+    if (actionsUl) {
+      actionsUl.innerHTML = '<li>Review original resume for missing metrics or certifications before re-analyzing.</li>';
+    }
+    var copyBtn = $('copyAllBtn');
+    if (copyBtn) copyBtn.hidden = true;
+    var bottomCopy = $('bottomCopyAllBtn');
+    if (bottomCopy) bottomCopy.hidden = true;
   }
 
   function setupBackNavigation(analysisId) {
     var metaMode = document.body.getAttribute('data-analysis-mode') || '';
-    var session = window.RefineCVSession.get(analysisId);
+    var session = window.RefineCVSession ? window.RefineCVSession.get(analysisId) : null;
     var isJob = (metaMode === 'SPECIFIC_JOB') || (session && session.mode === 'SPECIFIC_JOB');
     var fromHistory = sessionStorage.getItem('refinecv_from_' + analysisId) === 'history';
     var targetUrl = (isJob ? ('/job-analysis/' + encodeURIComponent(analysisId)) : ('/analysis/' + encodeURIComponent(analysisId))) + (fromHistory ? '?from=history' : '');
 
-    var links = ['topBackToAnalysisLink', 'backToReportBtn', 'bottomBackToReportBtn'];
-    links.forEach(function (id) {
+    ['topBackLink', 'loadingBackBtn', 'bottomBackToReportBtn'].forEach(function (id) {
       var el = $(id);
       if (el) {
         el.setAttribute('href', targetUrl);
+        el.textContent = '← Back to Analysis';
       }
     });
   }
@@ -160,6 +188,12 @@
     var metaId = document.body.getAttribute('data-analysis-id') || 'demo';
     state.analysisId = metaId;
     setupBackNavigation(metaId);
+
+    // Ensure completed-state actions remain hidden during loading
+    var copyBtn = $('copyAllBtn');
+    if (copyBtn) copyBtn.hidden = true;
+    var bottomCopy = $('bottomCopyAllBtn');
+    if (bottomCopy) bottomCopy.hidden = true;
 
     if (metaId === 'demo') {
       renderImprovements(DEMO_IMPROVEMENT, 'demo');
@@ -170,7 +204,7 @@
     var contentEl = $('contentState');
 
     // 1. Check client-side cached improvement
-    var cached = window.RefineCVSession.getImprovement(metaId);
+    var cached = window.RefineCVSession ? window.RefineCVSession.getImprovement(metaId) : null;
     if (cached) {
       if (loadingEl) loadingEl.hidden = true;
       if (contentEl) contentEl.hidden = false;
@@ -182,7 +216,7 @@
     if (window.__INITIAL_IMPROVEMENT__) {
       if (loadingEl) loadingEl.hidden = true;
       if (contentEl) contentEl.hidden = false;
-      window.RefineCVSession.saveImprovement(metaId, window.__INITIAL_IMPROVEMENT__);
+      if (window.RefineCVSession) window.RefineCVSession.saveImprovement(metaId, window.__INITIAL_IMPROVEMENT__);
       renderImprovements(window.__INITIAL_IMPROVEMENT__, metaId);
       return;
     }
@@ -202,16 +236,16 @@
       }
 
       var improvement = await res.json();
-      window.RefineCVSession.saveImprovement(metaId, improvement);
+      if (window.RefineCVSession) window.RefineCVSession.saveImprovement(metaId, improvement);
       if (loadingEl) loadingEl.hidden = true;
       if (contentEl) contentEl.hidden = false;
       renderImprovements(improvement, metaId);
 
     } catch (e) {
-      console.warn('Improvement request error, falling back to cached or demo data', e);
+      console.warn('Improvement request failed, displaying limitation notice', e);
       if (loadingEl) loadingEl.hidden = true;
       if (contentEl) contentEl.hidden = false;
-      renderImprovements(DEMO_IMPROVEMENT, metaId);
+      renderImprovementError(e.message || 'Cannot safely strengthen claims without additional evidence.');
     }
   });
 

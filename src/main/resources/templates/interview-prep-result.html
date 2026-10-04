@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interview Prep | RefineCV</title>
+  <meta name="description" content="Questions an interviewer would ask based on your resume, with evidence and claims to defend.">
+
+  <link rel="icon" type="image/svg+xml" href="/refinecv_brand_assets/svg/refinecv-favicon.svg">
+  <link rel="icon" href="/refinecv_brand_assets/favicon/favicon.ico" sizes="any">
+
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('refinecv-theme');
+        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (dark ? 'dark' : 'light'));
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body th:attr="data-prep-id=${prepId}">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="/" aria-label="RefineCV home">
+        <span class="brand-word">Refine<span class="brand-cv">CV</span></span>
+      </a>
+
+      <div class="header-right">
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/analyze" class="nav-link">Analyze</a>
+          <a href="/compare" class="nav-link">Compare</a>
+          <a href="/interview-prep" class="nav-link is-active" aria-current="page">Interview Prep</a>
+          <a href="/history" class="nav-link">History</a>
+        </nav>
+
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch theme">
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+
+        <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileNav">
+          <svg class="icon-menu" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <svg class="icon-close" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Drawer -->
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation" hidden>
+      <div class="wrap mobile-nav-inner">
+        <a href="/" class="mobile-nav-link">Home</a>
+        <a href="/#what-you-get" class="mobile-nav-link">What you get</a>
+        <a href="/#how-it-works" class="mobile-nav-link">How it works</a>
+        <a href="/history" class="mobile-nav-link">History</a>
+        <a href="/analyze" class="mobile-nav-link">Analyze Resume</a>
+        <a href="/compare" class="mobile-nav-link">Compare Resumes</a>
+        <a href="/interview-prep" class="mobile-nav-link mobile-nav-cta is-active" aria-current="page">Interview Prep &rarr;</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main" class="report-main">
+    <div class="wrap report-wrap" style="max-width: 900px;">
+      <!-- Top context bar -->
+      <div class="report-topbar">
+        <div class="report-topbar-left" style="flex-wrap: wrap; gap: 10px;">
+          <a href="/interview-prep" class="btn btn-quiet btn-sm nav-back-btn">&larr; Back to Prep</a>
+          <span class="file-badge" id="reportFileName">Resume.pdf</span>
+          <span class="report-date" id="reportDate">Prepared with RefineCV</span>
+        </div>
+        <div class="topbar-actions">
+          <a href="/interview-prep" class="btn btn-quiet btn-sm">Prepare Another CV</a>
+          <button class="btn btn-quiet btn-sm" type="button" id="printBtn">Save as PDF</button>
+        </div>
+      </div>
+
+      <!-- Edge Case: Unreadable Resume Alert -->
+      <div class="compare-alert-banner alert-unreadable" id="unreadableBanner" hidden style="margin-bottom: 24px;">
+        <div class="alert-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="alert-body">
+          <strong>Interview Prep Unavailable</strong>
+          <p id="unreadableMessage">The resume could not be reliably extracted to generate grounded interview questions.</p>
+        </div>
+        <a href="/interview-prep" class="btn btn-quiet btn-sm">Choose Another File</a>
+      </div>
+
+      <!-- Main Overview Hero Card -->
+      <section class="report-card card-hero" id="overviewCard">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <span class="card-eyebrow">Interview Intelligence Report</span>
+            <h1 class="h-md" style="margin-top: 4px; margin-bottom: 6px;">Questions your CV may invite</h1>
+            <p class="card-subtitle" style="margin-bottom: 0;">Prepare to explain the claims, projects, skills, and decisions written in your resume.</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="file-badge" id="questionCountBadge" style="font-weight: 700; color: var(--pen); font-size: .9rem;">7 Questions Prepared</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 18px 20px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ui);">
+          <span class="card-eyebrow" style="margin-bottom: 4px;">Preparation Focus</span>
+          <p id="overallPreparationNote" style="margin: 4px 0 0; font-family: var(--font-paper); font-size: 1.05rem; line-height: 1.55; color: var(--ink);">
+            Your resume contains several project and technology claims that are likely to invite follow-up questions. Focus your preparation on explaining your exact contribution, technical decisions, and measurable outcomes.
+          </p>
+        </div>
+      </section>
+
+      <!-- SECTION 1: Interview Questions -->
+      <section style="margin-top: 32px;" aria-labelledby="sec1Heading">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
+          <div>
+            <span class="card-eyebrow">Section 1</span>
+            <h2 id="sec1Heading" class="h-sm" style="margin: 2px 0 0;">Interview Questions</h2>
+          </div>
+          <span class="hint" id="questionsSummaryCount" style="font-size: .84rem;">Derived strictly from your resume</span>
+        </div>
+
+        <!-- Questions List Container -->
+        <div id="questionsContainer" style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- Question cards dynamically injected or hydrated -->
+        </div>
+
+        <!-- Generate More Action Bar -->
+        <div class="report-card" id="generateMoreCard" style="margin-top: 24px; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; background: var(--surface-2);">
+          <div>
+            <strong style="display: block; font-size: 1rem; color: var(--ink);">Need additional practice?</strong>
+            <span class="hint" id="generateMoreHint" style="font-size: .84rem;">Generate up to 15 grounded questions from your background.</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <span class="file-badge" id="questionCapBadge" style="font-weight: 600;">7 of 15 questions</span>
+            <button type="button" class="btn btn-primary btn-sm" id="generateMoreBtn">Generate More Questions (+4)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: Claims to Prepare -->
+      <section style="margin-top: 40px;" aria-labelledby="sec2Heading" id="claimsSection">
+        <div style="margin-bottom: 16px;">
+          <span class="card-eyebrow">Section 2</span>
+          <h2 id="sec2Heading" class="h-sm" style="margin: 2px 0 0;">Claims to Prepare</h2>
+          <p class="hint" style="margin-top: 4px; font-size: .88rem;">Key claims from your resume that invite follow-up questions or deeper explanation.</p>
+        </div>
+
+        <!-- Claims List Container -->
+        <div id="claimsContainer" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Claim cards dynamically injected -->
+        </div>
+      </section>
+
+      <!-- Bottom Actions Bar -->
+      <div class="report-bottom-bar" style="margin-top: 48px;">
+        <div class="cta-message">
+          <strong>Ready to prepare another document?</strong>
+          <span>Start a fresh interview preparation session with another resume.</span>
+        </div>
+        <div class="cta-buttons">
+          <a href="/interview-prep" class="btn btn-primary">Prepare Another CV &rarr;</a>
+          <a href="/" class="btn btn-quiet">Back to Home</a>
+          <button class="btn btn-quiet" type="button" id="bottomPrintBtn">Save as PDF</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-row">
+      <div class="foot-brand">
+        <div class="foot-brand-text">
+          <div class="foot-brand-title">Refine<span class="brand-cv foot-cv">CV</span></div>
+          <span class="foot-subtitle">resume intelligence</span>
+        </div>
+      </div>
+      <span class="foot-creator">
+        <span>Built by <a href="https://somaiyadhyey250-netizen.github.io/WebTechnology_P5/" target="_blank" rel="noopener">Dhyey Somaiya</a></span>
+        <span class="foot-upgrow" aria-hidden="true"><svg class="upgrow-mark" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 11.5L6.5 7.5L9.5 10.5L14 5M14 5H10.5M14 5V8.5"/></svg></span>
+      </span>
+    </div>
+  </footer>
+
+  <button class="scroll-top" id="scrollTopBtn" type="button" aria-label="Scroll to top" title="Scroll to top">&uarr;</button>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/interview-prep-report.js"></script>
+</body>
+</html>

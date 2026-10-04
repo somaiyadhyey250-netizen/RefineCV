@@ -454,4 +454,260 @@ public final class AIResponseParser {
                 java.time.Instant.now().toString()
         );
     }
+
+    public static InterviewPrepDTO parseAndValidateInterviewPrep(String rawResponse, String prepId, String filename) {
+        return parseAndValidateInterviewPrep(rawResponse, prepId, filename, 50000, new ObjectMapper(), "AI Provider");
+    }
+
+    public static List<InterviewQuestionDTO> parseAndValidateAdditionalQuestions(String rawResponse) {
+        return parseAndValidateAdditionalQuestions(rawResponse, 50000, new ObjectMapper(), "AI Provider");
+    }
+
+    public static InterviewAnswerEvaluationDTO parseAndValidateAnswerEvaluation(String rawResponse, String questionId) {
+        return parseAndValidateAnswerEvaluation(rawResponse, questionId, 50000, new ObjectMapper(), "AI Provider");
+    }
+
+    public static InterviewPrepDTO parseAndValidateInterviewPrep(
+            String rawResponse,
+            String prepId,
+            String filename,
+            int maxResponseCharacters,
+            ObjectMapper objectMapper,
+            String providerName
+    ) {
+        String clean = cleanJson(rawResponse);
+        if (clean.isBlank()) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.MALFORMED_JSON,
+                    providerName + " returned an empty response.");
+        }
+        if (clean.length() > maxResponseCharacters) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.RESPONSE_TOO_LARGE,
+                    providerName + " response exceeded the configured size limit.");
+        }
+
+        final JsonNode root;
+        try {
+            root = objectMapper.readerFor(JsonNode.class)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(clean);
+        } catch (Exception e) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.MALFORMED_JSON,
+                    providerName + " returned malformed JSON.", e);
+        }
+        if (root == null || !root.isObject()) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.INVALID_STRUCTURE,
+                    "Expected a JSON object for interview prep.");
+        }
+
+        if (!root.has("questions") || !root.get("questions").isArray()) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.INVALID_STRUCTURE,
+                    "Field 'questions' must be a JSON array.");
+        }
+
+        List<InterviewQuestionDTO> questions = new java.util.ArrayList<>();
+        for (JsonNode qNode : root.get("questions")) {
+            if (!qNode.isObject()) continue;
+            String question = qNode.has("question") && qNode.get("question").isTextual()
+                    ? qNode.get("question").asText().trim() : null;
+            if (question == null || question.isBlank()) continue;
+
+            String qType = qNode.has("questionType") && qNode.get("questionType").isTextual()
+                    ? qNode.get("questionType").asText().trim() : "DEPTH";
+            String risk = qNode.has("riskLevel") && qNode.get("riskLevel").isTextual()
+                    ? qNode.get("riskLevel").asText().trim() : "BE_READY";
+            String basedOn = qNode.has("basedOn") && qNode.get("basedOn").isTextual()
+                    ? qNode.get("basedOn").asText().trim() : "Resume Experience";
+            String intent = qNode.has("interviewerIntent") && qNode.get("interviewerIntent").isTextual()
+                    ? qNode.get("interviewerIntent").asText().trim() : "To evaluate depth of knowledge.";
+            String hint = qNode.has("preparationHint") && qNode.get("preparationHint").isTextual()
+                    ? qNode.get("preparationHint").asText().trim() : "Explain your role, decisions, and concrete outcomes.";
+
+            questions.add(new InterviewQuestionDTO(
+                    java.util.UUID.randomUUID().toString(),
+                    question,
+                    qType,
+                    risk,
+                    basedOn,
+                    intent,
+                    hint
+            ));
+        }
+
+        if (questions.isEmpty()) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.INVALID_STRUCTURE,
+                    "Interview prep response must contain at least one valid grounded question.");
+        }
+
+        List<InterviewClaimDTO> claims = new java.util.ArrayList<>();
+        if (root.has("claimsToPrepare") && root.get("claimsToPrepare").isArray()) {
+            for (JsonNode cNode : root.get("claimsToPrepare")) {
+                if (!cNode.isObject()) continue;
+                String claim = cNode.has("claim") && cNode.get("claim").isTextual()
+                        ? cNode.get("claim").asText().trim() : null;
+                if (claim == null || claim.isBlank()) continue;
+
+                String risk = cNode.has("riskLevel") && cNode.get("riskLevel").isTextual()
+                        ? cNode.get("riskLevel").asText().trim() : "BE_READY";
+                String note = cNode.has("preparationNote") && cNode.get("preparationNote").isTextual()
+                        ? cNode.get("preparationNote").asText().trim() : "Be ready to explain your exact contribution.";
+
+                claims.add(new InterviewClaimDTO(
+                        java.util.UUID.randomUUID().toString(),
+                        claim,
+                        risk,
+                        note
+                ));
+            }
+        }
+
+        String overallNote = "Your resume contains several project and technology claims that are likely to invite follow-up questions. Focus your preparation on explaining your exact contribution, technical decisions, and measurable outcomes.";
+        if (root.has("overallPreparationNote") && root.get("overallPreparationNote").isTextual()
+                && !root.get("overallPreparationNote").asText().isBlank()) {
+            overallNote = root.get("overallPreparationNote").asText().trim();
+        }
+
+        return new InterviewPrepDTO(
+                prepId,
+                filename,
+                java.time.Instant.now().toString(),
+                questions.size(),
+                questions,
+                claims,
+                overallNote,
+                false,
+                null,
+                providerName
+        );
+    }
+
+    public static List<InterviewQuestionDTO> parseAndValidateAdditionalQuestions(
+            String rawResponse,
+            int maxResponseCharacters,
+            ObjectMapper objectMapper,
+            String providerName
+    ) {
+        String clean = cleanJson(rawResponse);
+        if (clean.isBlank()) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.MALFORMED_JSON,
+                    providerName + " returned an empty response.");
+        }
+        if (clean.length() > maxResponseCharacters) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.RESPONSE_TOO_LARGE,
+                    providerName + " response exceeded the configured size limit.");
+        }
+
+        final JsonNode root;
+        try {
+            root = objectMapper.readerFor(JsonNode.class)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(clean);
+        } catch (Exception e) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.MALFORMED_JSON,
+                    providerName + " returned malformed JSON.", e);
+        }
+
+        if (root == null || !root.isObject() || !root.has("questions") || !root.get("questions").isArray()) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.INVALID_STRUCTURE,
+                    "Expected a JSON object with 'questions' array.");
+        }
+
+        List<InterviewQuestionDTO> questions = new java.util.ArrayList<>();
+        for (JsonNode qNode : root.get("questions")) {
+            if (!qNode.isObject()) continue;
+            String question = qNode.has("question") && qNode.get("question").isTextual()
+                    ? qNode.get("question").asText().trim() : null;
+            if (question == null || question.isBlank()) continue;
+
+            String qType = qNode.has("questionType") && qNode.get("questionType").isTextual()
+                    ? qNode.get("questionType").asText().trim() : "DEPTH";
+            String risk = qNode.has("riskLevel") && qNode.get("riskLevel").isTextual()
+                    ? qNode.get("riskLevel").asText().trim() : "BE_READY";
+            String basedOn = qNode.has("basedOn") && qNode.get("basedOn").isTextual()
+                    ? qNode.get("basedOn").asText().trim() : "Resume Experience";
+            String intent = qNode.has("interviewerIntent") && qNode.get("interviewerIntent").isTextual()
+                    ? qNode.get("interviewerIntent").asText().trim() : "To evaluate depth of knowledge.";
+            String hint = qNode.has("preparationHint") && qNode.get("preparationHint").isTextual()
+                    ? qNode.get("preparationHint").asText().trim() : "Explain your role, decisions, and concrete outcomes.";
+
+            questions.add(new InterviewQuestionDTO(
+                    java.util.UUID.randomUUID().toString(),
+                    question,
+                    qType,
+                    risk,
+                    basedOn,
+                    intent,
+                    hint
+            ));
+        }
+
+        return questions;
+    }
+
+    public static InterviewAnswerEvaluationDTO parseAndValidateAnswerEvaluation(
+            String rawResponse,
+            String questionId,
+            int maxResponseCharacters,
+            ObjectMapper objectMapper,
+            String providerName
+    ) {
+        String clean = cleanJson(rawResponse);
+        if (clean.isBlank()) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.MALFORMED_JSON,
+                    providerName + " returned an empty response.");
+        }
+        if (clean.length() > maxResponseCharacters) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.RESPONSE_TOO_LARGE,
+                    providerName + " response exceeded the configured size limit.");
+        }
+
+        final JsonNode root;
+        try {
+            root = objectMapper.readerFor(JsonNode.class)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(clean);
+        } catch (Exception e) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.MALFORMED_JSON,
+                    providerName + " returned malformed JSON.", e);
+        }
+
+        if (root == null || !root.isObject()) {
+            throw new GeminiResponseException(GeminiResponseException.Reason.INVALID_STRUCTURE,
+                    "Expected a JSON object for answer evaluation.");
+        }
+
+        String answerQuality = root.has("answerQuality") && root.get("answerQuality").isTextual()
+                ? root.get("answerQuality").asText().trim()
+                : "Your answer provides relevant context. Consider emphasizing concrete outcomes and personal responsibilities.";
+
+        List<String> strengths = new java.util.ArrayList<>();
+        if (root.has("strengths") && root.get("strengths").isArray()) {
+            for (JsonNode s : root.get("strengths")) {
+                if (s.isTextual() && !s.asText().isBlank()) {
+                    strengths.add(s.asText().trim());
+                }
+            }
+        }
+        if (strengths.isEmpty()) {
+            strengths.add("Directly addresses the subject of the question.");
+        }
+
+        List<String> improvements = new java.util.ArrayList<>();
+        if (root.has("improvements") && root.get("improvements").isArray()) {
+            for (JsonNode imp : root.get("improvements")) {
+                if (imp.isTextual() && !imp.asText().isBlank()) {
+                    improvements.add(imp.asText().trim());
+                }
+            }
+        }
+        if (improvements.isEmpty()) {
+            improvements.add("Include more specific metrics, challenges encountered, or architectural trade-offs.");
+        }
+
+        return new InterviewAnswerEvaluationDTO(
+                questionId,
+                answerQuality,
+                strengths,
+                improvements
+        );
+    }
 }

@@ -23,7 +23,7 @@ public class InMemoryAnalysisRateLimiter {
     private final Map<String, Window> windows = new HashMap<>();
 
     public InMemoryAnalysisRateLimiter(
-            @Value("${refinecv.analysis.rate-limit.max-requests:5}") int maxRequests,
+            @Value("${refinecv.analysis.rate-limit.max-requests:10}") int maxRequests,
             @Value("${refinecv.analysis.rate-limit.window:15m}") Duration window,
             @Value("${refinecv.analysis.rate-limit.max-tracked-clients:10000}") int maxTrackedClients
     ) {

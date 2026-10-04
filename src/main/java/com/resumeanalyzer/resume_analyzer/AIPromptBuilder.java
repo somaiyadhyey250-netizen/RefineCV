@@ -1,5 +1,6 @@
 package com.resumeanalyzer.resume_analyzer;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Shared prompt construction ensuring uniform security boundary isolation across AI providers. */
@@ -371,5 +372,172 @@ public final class AIPromptBuilder {
                 """.formatted(boundaryA, resumeTextA, boundaryA, boundaryB, resumeTextB, boundaryB));
 
         return prompt.toString();
+    }
+
+    /**
+     * Builds the standalone Interview Prep prompt instructing the AI to generate
+     * 6-8 grounded questions, risk levels, interviewer intent, preparation hints,
+     * claims to prepare, and overall preparation note.
+     */
+    public static String buildInterviewPrepPrompt(String resumeText) {
+        String boundaryResume = UUID.randomUUID().toString();
+
+        return """
+                You are a senior technical interviewer and hiring manager conducting an in-depth interview preparation analysis.
+                Your task is to analyze the candidate's uploaded resume and generate the exact questions an interviewer would ask, and highlight claims the candidate must be ready to defend.
+
+                CORE PRODUCT PRINCIPLES:
+                1. STRICT GROUNDING: Every question and claim MUST be derived directly from projects, technologies, skills, experiences, achievements, responsibilities, or certifications explicitly present in the resume.
+                2. NO FABRICATION: Never invent skills, technologies, projects, achievements, employment, or metrics that are not stated on the resume.
+                3. EVIDENCE ("basedOn"): Every question MUST cite an actual short excerpt or claim from the resume that prompts the question.
+                4. NO GENERIC HR QUESTIONS: Do NOT ask generic questions such as "Tell me about yourself", "What are your strengths?", or "Where do you see yourself in five years?".
+                5. QUESTION TYPES:
+                   - "DEPTH": Tests technical or detail understanding of a stated claim (e.g., "How did you implement the REST API in your project?").
+                   - "PROOF": Tests evidence and actual personal contribution (e.g., "What part of this project did you personally implement, and how did you verify it worked?").
+                   - "WHY": Tests reasoning and decision-making (e.g., "Why did you choose Spring Boot for this project?").
+                6. RISK LEVELS:
+                   - "SAFE": The resume claim is clear, specific, and reasonably supported by evidence.
+                   - "BE_READY": The claim is plausible but broad enough that an interviewer may ask for deeper proof.
+                   - "RISKY": The resume makes a strong or broad claim but provides weak evidence, vague wording, or insufficient detail.
+                   (Risk reflects only how much the wording invites scrutiny, NOT whether the candidate actually knows the topic. Never accuse the candidate of lying.)
+                7. INTERVIEWER INTENT: Concise, factual reason why an interviewer might ask this question.
+                8. PREPARATION HINT: Practical, constructive advice on what details, architecture, or metrics the candidate should prepare to explain.
+                9. CLAIMS TO PREPARE: Identify 3 to 5 highest-priority claims from the resume that invite follow-up (broad technical claims, strong achievement claims, leadership claims).
+                10. OVERALL PREPARATION NOTE: A short factual summary (2-3 sentences) derived from the resume guiding the candidate's preparation focus.
+
+                TARGET QUESTION COUNT:
+                Generate exactly 6 to 8 questions (target 7 questions).
+
+                REQUIRED JSON STRUCTURE:
+                Output strictly valid JSON matching this schema with no markdown code blocks:
+                {
+                  "questions": [
+                    {
+                      "question": "Specific question derived from the CV",
+                      "questionType": "DEPTH",
+                      "riskLevel": "BE_READY",
+                      "basedOn": "Actual short excerpt or claim from the resume",
+                      "interviewerIntent": "Concise reason why an interviewer asks this",
+                      "preparationHint": "Be ready to explain..."
+                    }
+                  ],
+                  "claimsToPrepare": [
+                    {
+                      "claim": "High-priority claim from the resume",
+                      "riskLevel": "RISKY",
+                      "preparationNote": "Be ready to explain your exact responsibilities, architecture, and personal contributions."
+                    }
+                  ],
+                  "overallPreparationNote": "Your resume contains several project and technology claims that are likely to invite follow-up questions. Focus your preparation on explaining your exact contribution, technical decisions, and measurable outcomes."
+                }
+
+                <<<BEGIN UNTRUSTED RESUME DATA %s>>>
+                %s
+                <<<END UNTRUSTED RESUME DATA %s>>>
+                """.formatted(boundaryResume, resumeText != null ? resumeText : "", boundaryResume);
+    }
+
+    /**
+     * Builds prompt to generate approximately 4 additional interview questions without duplicating existing ones.
+     */
+    public static String buildGenerateMoreQuestionsPrompt(String resumeText, List<String> existingQuestions) {
+        String boundaryResume = UUID.randomUUID().toString();
+        StringBuilder existingList = new StringBuilder();
+        if (existingQuestions != null && !existingQuestions.isEmpty()) {
+            for (String eq : existingQuestions) {
+                if (eq != null && !eq.isBlank()) {
+                    existingList.append("- ").append(eq.strip()).append("\n");
+                }
+            }
+        }
+
+        return """
+                You are a senior hiring manager generating additional interview questions from the candidate's resume.
+                Generate exactly 4 NEW, grounded interview questions that explore different aspects, technologies, or responsibilities from the resume.
+
+                CRITICAL RULE: DO NOT duplicate or rephrase any of the following already-generated questions:
+                %s
+
+                CORE REQUIREMENTS:
+                1. STRICT GROUNDING: Derive questions strictly from claims on the resume. Do NOT fabricate.
+                2. QUESTION TYPES: "DEPTH", "PROOF", or "WHY".
+                3. RISK LEVELS: "SAFE", "BE_READY", or "RISKY".
+                4. Include "basedOn" (exact excerpt from CV), "interviewerIntent", and "preparationHint" for each question.
+
+                REQUIRED JSON STRUCTURE:
+                {
+                  "questions": [
+                    {
+                      "question": "New grounded interview question",
+                      "questionType": "DEPTH",
+                      "riskLevel": "BE_READY",
+                      "basedOn": "Actual excerpt from resume",
+                      "interviewerIntent": "Why an interviewer asks this",
+                      "preparationHint": "What to explain"
+                    }
+                  ]
+                }
+
+                <<<BEGIN UNTRUSTED RESUME DATA %s>>>
+                %s
+                <<<END UNTRUSTED RESUME DATA %s>>>
+                """.formatted(
+                existingList.length() > 0 ? existingList.toString() : "(none)",
+                boundaryResume,
+                resumeText != null ? resumeText : "",
+                boundaryResume
+        );
+    }
+
+    /**
+     * Builds prompt to evaluate a user's practice answer for a specific grounded interview question.
+     */
+    public static String buildAnswerEvaluationPrompt(String question, String basedOn, String userAnswer) {
+        String boundaryUser = UUID.randomUUID().toString();
+
+        return """
+                You are a constructive interview coach evaluating a candidate's practiced answer to a specific interview question.
+
+                INTERVIEW QUESTION:
+                %s
+
+                RESUME CONTEXT / CLAIM:
+                %s
+
+                CRITERIA TO EVALUATE:
+                1. Did the answer actually address the core question?
+                2. Clarity and structure.
+                3. Specificity vs unnecessary vagueness.
+                4. Concrete examples and personal contribution (e.g. STAR approach: Situation, Task, Action, Result).
+                5. Important details that may be missing.
+
+                CONSTRUCTIVE PRINCIPLES:
+                - Do NOT give a numeric score or pass/fail verdict.
+                - Evaluate "Answer Quality" constructively.
+                - Identify 2-3 genuine strengths of the candidate's answer.
+                - Identify 1-2 actionable, concrete improvements to make the answer more compelling in an interview.
+
+                REQUIRED JSON STRUCTURE:
+                {
+                  "answerQuality": "Concise 1-2 sentence overview of answer strength and clarity.",
+                  "strengths": [
+                    "Specific strength 1",
+                    "Specific strength 2"
+                  ],
+                  "improvements": [
+                    "Constructive suggestion for improvement"
+                  ]
+                }
+
+                <<<BEGIN UNTRUSTED USER ANSWER %s>>>
+                %s
+                <<<END UNTRUSTED USER ANSWER %s>>>
+                """.formatted(
+                question != null ? question : "",
+                basedOn != null ? basedOn : "",
+                boundaryUser,
+                userAnswer != null ? userAnswer.strip() : "",
+                boundaryUser
+        );
     }
 }

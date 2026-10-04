@@ -14,9 +14,19 @@ final class AnalysisRequestState {
     private final AtomicBoolean terminal = new AtomicBoolean();
     private final AtomicReference<Future<?>> task = new AtomicReference<>();
     private final AtomicReference<ScheduledFuture<?>> timeout = new AtomicReference<>();
-    private final String analysisId = UUID.randomUUID().toString();
+    private final String analysisId;
     private final long startedAtNanos = System.nanoTime();
     private volatile String stage = "upload";
+
+    AnalysisRequestState() {
+        this(UUID.randomUUID().toString());
+    }
+
+    AnalysisRequestState(String analysisId) {
+        this.analysisId = analysisId != null && !analysisId.isBlank()
+                ? analysisId
+                : UUID.randomUUID().toString();
+    }
 
     String getAnalysisId() {
         return analysisId;

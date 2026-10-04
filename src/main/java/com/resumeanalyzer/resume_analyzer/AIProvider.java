@@ -1,5 +1,6 @@
 package com.resumeanalyzer.resume_analyzer;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 /** Common contract implemented by AI providers (Gemini, Groq) and coordinating services. */
@@ -82,5 +83,53 @@ public interface AIProvider {
     ) {
         ResumeComparisonDTO dto = compareResumes(resumeTextA, resumeTextB, jobDescription, comparisonId, fileNameA, fileNameB, progress);
         return new AIComparisonResult(dto, getProviderName());
+    }
+
+    /** Performs interview preparation generation from resume text. */
+    default InterviewPrepDTO generateInterviewPrep(
+            String resumeText,
+            String prepId,
+            String filename,
+            Consumer<String> progress
+    ) {
+        throw new UnsupportedOperationException("Interview prep not supported by provider " + getProviderName());
+    }
+
+    /** Performs interview preparation generation and returns result with provider name. */
+    default AIInterviewPrepResult generateInterviewPrepWithProvider(
+            String resumeText,
+            String prepId,
+            String filename,
+            Consumer<String> progress
+    ) {
+        InterviewPrepDTO dto = generateInterviewPrep(resumeText, prepId, filename, progress);
+        return new AIInterviewPrepResult(dto, getProviderName());
+    }
+
+    /** Generates additional grounded questions avoiding duplicates of existing questions. */
+    default List<InterviewQuestionDTO> generateMoreQuestions(
+            String resumeText,
+            List<String> existingQuestions
+    ) {
+        throw new UnsupportedOperationException("Generate more questions not supported by provider " + getProviderName());
+    }
+
+    /** Evaluates a user practice answer against a grounded question. */
+    default InterviewAnswerEvaluationDTO evaluateAnswer(
+            String question,
+            String basedOn,
+            String userAnswer
+    ) {
+        throw new UnsupportedOperationException("Answer evaluation not supported by provider " + getProviderName());
+    }
+
+    /** Evaluates a user practice answer and returns result with provider name. */
+    default AIAnswerEvaluationResult evaluateAnswerWithProvider(
+            String question,
+            String basedOn,
+            String userAnswer
+    ) {
+        InterviewAnswerEvaluationDTO dto = evaluateAnswer(question, basedOn, userAnswer);
+        return new AIAnswerEvaluationResult(dto, getProviderName());
     }
 }

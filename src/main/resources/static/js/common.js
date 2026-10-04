@@ -391,6 +391,56 @@
         return null;
       }
     },
+    saveInterviewPrep: function (id, data, fileName) {
+      if (!id || id === 'demo') return;
+      var file = fileName || (data && data.filename) || 'Resume.pdf';
+      if (file === 'Sample_Resume.pdf' || file === 'Uploaded_Resume.pdf') return;
+      try {
+        var qCount = (data && data.questions && data.questions.length) || (data && data.questionCount) || 0;
+        var payload = {
+          prepId: id,
+          result: data,
+          type: 'INTERVIEW_PREP',
+          fileName: file,
+          questionCount: qCount,
+          overallPreparationNote: data && data.overallPreparationNote ? data.overallPreparationNote : '',
+          timestamp: new Date().toISOString()
+        };
+        sessionStorage.setItem('refinecv_prep_' + id, JSON.stringify(payload));
+        localStorage.setItem('refinecv_prep_' + id, JSON.stringify(payload));
+        sessionStorage.setItem('refinecv_last_prep_id', id);
+
+        // Append to history list
+        var history = [];
+        try {
+          history = JSON.parse(localStorage.getItem('refinecv_history') || sessionStorage.getItem('refinecv_history') || '[]');
+        } catch (e) {}
+        history = history.filter(function (h) {
+          return h && h.analysisId !== id && h.analysisId !== 'demo'
+            && h.fileName !== 'Sample_Resume.pdf' && h.fileName !== 'Uploaded_Resume.pdf';
+        });
+        history.unshift({
+          analysisId: id,
+          type: 'INTERVIEW_PREP',
+          mode: 'INTERVIEW_PREP',
+          fileName: file,
+          score: qCount,
+          verdict: payload.overallPreparationNote,
+          date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+        var trimmed = JSON.stringify(history.slice(0, 30));
+        sessionStorage.setItem('refinecv_history', trimmed);
+        localStorage.setItem('refinecv_history', trimmed);
+      } catch (e) {}
+    },
+    getInterviewPrep: function (id) {
+      try {
+        var str = sessionStorage.getItem('refinecv_prep_' + id) || localStorage.getItem('refinecv_prep_' + id);
+        return str ? JSON.parse(str) : null;
+      } catch (e) {
+        return null;
+      }
+    },
     getLastId: function () {
       return sessionStorage.getItem('refinecv_last_id') || localStorage.getItem('refinecv_last_id');
     },
@@ -401,7 +451,7 @@
         return raw.filter(function (h) {
           if (!h || !h.analysisId) return false;
           if (h.analysisId === 'demo') return false;
-          if (h.type !== 'COMPARE' && typeof h.analysisId === 'string' && h.analysisId.startsWith('cmp-')) return false;
+          if (h.type !== 'COMPARE' && h.type !== 'INTERVIEW_PREP' && typeof h.analysisId === 'string' && (h.analysisId.startsWith('cmp-') || h.analysisId.startsWith('prep-'))) return false;
           if (h.fileName === 'Sample_Resume.pdf' || h.fileName === 'Uploaded_Resume.pdf') return false;
           if (h.fileNameB === 'Sample_Resume.pdf' || h.fileNameB === 'Uploaded_Resume.pdf') return false;
           return true;
@@ -426,6 +476,8 @@
               sessionStorage.removeItem('refinecv_' + id);
               localStorage.removeItem('refinecv_cmp_' + id);
               sessionStorage.removeItem('refinecv_cmp_' + id);
+              localStorage.removeItem('refinecv_prep_' + id);
+              sessionStorage.removeItem('refinecv_prep_' + id);
               localStorage.removeItem('refinecv_imp_' + id);
               sessionStorage.removeItem('refinecv_imp_' + id);
             } catch (e) {}
@@ -438,6 +490,8 @@
         sessionStorage.removeItem('refinecv_last_id');
         localStorage.removeItem('refinecv_last_cmp_id');
         sessionStorage.removeItem('refinecv_last_cmp_id');
+        localStorage.removeItem('refinecv_last_prep_id');
+        sessionStorage.removeItem('refinecv_last_prep_id');
       } catch (e) {}
     }
   };

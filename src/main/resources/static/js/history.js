@@ -1,7 +1,10 @@
 /* ==========================================================
    RefineCV /history Session History Logic
-   Renders active session analyses, timestamp, score, and links
-   Provides accessible "Clear History" confirmation and execution
+   Renders active session records across THREE distinct sections:
+   1. Analyze (General & Job Analysis)
+   2. Compare (Resume Comparisons)
+   3. Interview Prep (Interview Prep from CV)
+   Provides accessible "Clear History" confirmation and execution.
    ========================================================== */
 
 (function () {
@@ -28,7 +31,7 @@
         if (Array.isArray(serverItems)) {
           serverItems.forEach(function (si) {
             if (!si || !si.analysisId || si.analysisId === 'demo') return;
-            if (si.type !== 'COMPARE' && String(si.analysisId).startsWith('cmp-')) return;
+            if (si.type !== 'COMPARE' && si.type !== 'INTERVIEW_PREP' && String(si.analysisId).startsWith('cmp-')) return;
             if (si.fileName === 'Sample_Resume.pdf' || si.fileName === 'Uploaded_Resume.pdf') return;
             if (si.fileNameB === 'Sample_Resume.pdf' || si.fileNameB === 'Uploaded_Resume.pdf') return;
 
@@ -54,8 +57,133 @@
       console.warn('Could not fetch server history, using local history', e);
     }
 
+    function createAnalyzeCard(item) {
+      var card = document.createElement('div');
+      card.className = 'report-card';
+      card.style.padding = '22px 28px';
+
+      var isJobMode = item.mode === 'SPECIFIC_JOB';
+      var reportUrl = (isJobMode ? ('/job-analysis/' + encodeURIComponent(item.analysisId)) : ('/analysis/' + encodeURIComponent(item.analysisId))) + '?from=history';
+
+      card.innerHTML =
+        '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">' +
+          '<div>' +
+            '<strong style="font-size: 1.1rem; display: block; margin-bottom: 2px;">' + window.escapeHTML(item.fileName || 'Resume.pdf') + '</strong>' +
+            '<small style="color: var(--ink-3);">Conducted ' + window.escapeHTML(item.date || 'Recent') + ' &bull; ID: ' + window.escapeHTML(item.analysisId) + '</small>' +
+          '</div>' +
+          '<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">' +
+            '<span class="file-badge" style="font-weight: 700; color: var(--pen);">Score: ' + (item.score || 0) + '/100</span>' +
+            '<span class="makeover-pill">' + (isJobMode ? 'Specific Job Match' : 'General Review') + '</span>' +
+            '<a href="' + reportUrl + '" class="btn btn-primary btn-sm">View Report &rarr;</a>' +
+          '</div>' +
+        '</div>';
+      return card;
+    }
+
+    function createCompareCard(item) {
+      var card = document.createElement('div');
+      card.className = 'report-card';
+      card.style.padding = '22px 28px';
+
+      var targetUrl = '/compare/' + encodeURIComponent(item.analysisId) + '?from=history';
+      var isJob = !!item.jobContext;
+      var verdictText = item.verdict ? item.verdict : ('A: ' + (item.score || 0) + ' vs B: ' + (item.scoreB || 0));
+      var filesTitle = window.escapeHTML(item.fileName || 'Resume A') + ' vs ' + window.escapeHTML(item.fileNameB || 'Resume B');
+      var jobMeta = isJob ? '<span style="display: block; font-size: .84rem; color: var(--ink-2); margin-top: 2px;">Role Context: ' + window.escapeHTML(item.jobContext.length > 50 ? item.jobContext.substring(0, 50) + '...' : item.jobContext) + '</span>' : '';
+
+      card.innerHTML =
+        '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">' +
+          '<div>' +
+            '<span class="card-eyebrow" style="margin-bottom: 2px;">Resume Comparison</span>' +
+            '<strong style="font-size: 1.1rem; display: block; margin-bottom: 2px;">' + filesTitle + '</strong>' +
+            '<small style="color: var(--ink-3);">Conducted ' + window.escapeHTML(item.date || 'Recent') + ' &bull; ID: ' + window.escapeHTML(item.analysisId) + '</small>' +
+            jobMeta +
+          '</div>' +
+          '<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">' +
+            '<span class="file-badge" style="font-weight: 700; color: var(--pen);">' + window.escapeHTML(verdictText) + '</span>' +
+            '<span class="makeover-pill">' + (isJob ? 'Job-Specific Comparison' : 'General Comparison') + '</span>' +
+            '<a href="' + targetUrl + '" class="btn btn-primary btn-sm">View Comparison &rarr;</a>' +
+          '</div>' +
+        '</div>';
+      return card;
+    }
+
+    function createInterviewPrepCard(item) {
+      var card = document.createElement('div');
+      card.className = 'report-card';
+      card.style.padding = '22px 28px';
+
+      var prepUrl = '/interview-prep/' + encodeURIComponent(item.analysisId) + '?from=history';
+      var qCount = item.score || 0;
+      var qText = qCount + (qCount === 1 ? ' Question' : ' Questions');
+      var noteMeta = item.verdict
+        ? '<span style="display: block; font-size: .84rem; color: var(--ink-2); margin-top: 4px; max-width: 50ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + window.escapeHTML(item.verdict) + '</span>'
+        : '';
+
+      card.innerHTML =
+        '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">' +
+          '<div>' +
+            '<span class="card-eyebrow" style="color: var(--pen); margin-bottom: 2px;">Interview Prep</span>' +
+            '<strong style="font-size: 1.1rem; display: block; margin-bottom: 2px;">' + window.escapeHTML(item.fileName || 'Resume.pdf') + '</strong>' +
+            '<small style="color: var(--ink-3);">Prepared ' + window.escapeHTML(item.date || 'Recent') + ' &bull; ID: ' + window.escapeHTML(item.analysisId) + '</small>' +
+            noteMeta +
+          '</div>' +
+          '<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">' +
+            '<span class="file-badge" style="font-weight: 700; color: var(--pen);">' + qText + '</span>' +
+            '<span class="makeover-pill" style="background: var(--pen-soft); color: var(--pen);">Interview Guide</span>' +
+            '<a href="' + prepUrl + '" class="btn btn-primary btn-sm">View Prep Guide &rarr;</a>' +
+          '</div>' +
+        '</div>';
+      return card;
+    }
+
+    function renderSection(eyebrow, title, items, createCardFn) {
+      if (!items || !items.length) return null;
+
+      var sec = document.createElement('div');
+      sec.className = 'history-section';
+
+      var header = document.createElement('div');
+      header.className = 'history-section-header';
+      header.innerHTML =
+        '<span class="card-eyebrow">' + window.escapeHTML(eyebrow) + '</span>' +
+        '<h2 class="h-sm">' + window.escapeHTML(title) + '</h2>';
+      sec.appendChild(header);
+
+      var itemsContainer = document.createElement('div');
+      itemsContainer.className = 'history-section-items';
+      items.forEach(function (it) {
+        itemsContainer.appendChild(createCardFn(it));
+      });
+      sec.appendChild(itemsContainer);
+
+      return sec;
+    }
+
     function renderHistory() {
       if (!clientHistory || !clientHistory.length) {
+        if (emptyState) emptyState.hidden = false;
+        historyList.hidden = true;
+        historyList.innerHTML = '';
+        if (clearHistoryBtn) clearHistoryBtn.disabled = true;
+        return;
+      }
+
+      var analyzeItems = [];
+      var compareItems = [];
+      var interviewPrepItems = [];
+
+      clientHistory.forEach(function (item) {
+        if (item.type === 'COMPARE') {
+          compareItems.push(item);
+        } else if (item.type === 'INTERVIEW_PREP') {
+          interviewPrepItems.push(item);
+        } else {
+          analyzeItems.push(item);
+        }
+      });
+
+      if (!analyzeItems.length && !compareItems.length && !interviewPrepItems.length) {
         if (emptyState) emptyState.hidden = false;
         historyList.hidden = true;
         historyList.innerHTML = '';
@@ -68,54 +196,22 @@
       historyList.innerHTML = '';
       if (clearHistoryBtn) clearHistoryBtn.disabled = false;
 
-      clientHistory.forEach(function (item) {
-        var card = document.createElement('div');
-        card.className = 'report-card';
-        card.style.padding = '22px 28px';
+      var wrap = document.createElement('div');
+      wrap.className = 'history-sections-wrap';
 
-        var isCompare = item.type === 'COMPARE';
+      // 1. Analyze Section
+      var analyzeSec = renderSection('Analyze', 'Resume Analyses', analyzeItems, createAnalyzeCard);
+      if (analyzeSec) wrap.appendChild(analyzeSec);
 
-        if (isCompare) {
-          var targetUrl = '/compare/' + encodeURIComponent(item.analysisId) + '?from=history';
-          var isJob = !!item.jobContext;
-          var verdictText = item.verdict ? item.verdict : ('A: ' + (item.score || 0) + ' vs B: ' + (item.scoreB || 0));
-          var filesTitle = window.escapeHTML(item.fileName || 'Resume A') + ' vs ' + window.escapeHTML(item.fileNameB || 'Resume B');
-          var jobMeta = isJob ? '<span style="display: block; font-size: .84rem; color: var(--ink-2); margin-top: 2px;">Role Context: ' + window.escapeHTML(item.jobContext.length > 50 ? item.jobContext.substring(0, 50) + '...' : item.jobContext) + '</span>' : '';
+      // 2. Compare Section
+      var compareSec = renderSection('Compare', 'Resume Comparisons', compareItems, createCompareCard);
+      if (compareSec) wrap.appendChild(compareSec);
 
-          card.innerHTML =
-            '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">' +
-              '<div>' +
-                '<span class="card-eyebrow" style="margin-bottom: 2px;">Resume Comparison</span>' +
-                '<strong style="font-size: 1.1rem; display: block; margin-bottom: 2px;">' + filesTitle + '</strong>' +
-                '<small style="color: var(--ink-3);">Conducted ' + window.escapeHTML(item.date || 'Recent') + ' &bull; ID: ' + window.escapeHTML(item.analysisId) + '</small>' +
-                jobMeta +
-              '</div>' +
-              '<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">' +
-                '<span class="file-badge" style="font-weight: 700; color: var(--pen);">' + window.escapeHTML(verdictText) + '</span>' +
-                '<span class="makeover-pill">' + (isJob ? 'Job-Specific Comparison' : 'General Comparison') + '</span>' +
-                '<a href="' + targetUrl + '" class="btn btn-primary btn-sm">View Comparison &rarr;</a>' +
-              '</div>' +
-            '</div>';
-        } else {
-          var isJobMode = item.mode === 'SPECIFIC_JOB';
-          var reportUrl = (isJobMode ? ('/job-analysis/' + encodeURIComponent(item.analysisId)) : ('/analysis/' + encodeURIComponent(item.analysisId))) + '?from=history';
+      // 3. Interview Prep Section
+      var prepSec = renderSection('Interview Prep', 'Interview Prep from CV', interviewPrepItems, createInterviewPrepCard);
+      if (prepSec) wrap.appendChild(prepSec);
 
-          card.innerHTML =
-            '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">' +
-              '<div>' +
-                '<strong style="font-size: 1.1rem; display: block; margin-bottom: 2px;">' + window.escapeHTML(item.fileName || 'Resume.pdf') + '</strong>' +
-                '<small style="color: var(--ink-3);">Conducted ' + window.escapeHTML(item.date || 'Recent') + ' &bull; ID: ' + window.escapeHTML(item.analysisId) + '</small>' +
-              '</div>' +
-              '<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">' +
-                '<span class="file-badge" style="font-weight: 700; color: var(--pen);">Score: ' + (item.score || 0) + '/100</span>' +
-                '<span class="makeover-pill">' + (isJobMode ? 'Specific Job Match' : 'General Review') + '</span>' +
-                '<a href="' + reportUrl + '" class="btn btn-primary btn-sm">View Report &rarr;</a>' +
-              '</div>' +
-            '</div>';
-        }
-
-        historyList.appendChild(card);
-      });
+      historyList.appendChild(wrap);
     }
 
     renderHistory();

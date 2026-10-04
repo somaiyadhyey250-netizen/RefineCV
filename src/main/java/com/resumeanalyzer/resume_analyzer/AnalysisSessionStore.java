@@ -143,6 +143,8 @@ public class AnalysisSessionStore {
 
     private final Map<String, FullSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, ResumeComparisonDTO> comparisons = new ConcurrentHashMap<>();
+    private final Map<String, InterviewPrepDTO> interviewPreps = new ConcurrentHashMap<>();
+    private final Map<String, String> prepResumeTexts = new ConcurrentHashMap<>();
     private final long ttlMillis;
     private final int maxSessions;
 
@@ -293,13 +295,47 @@ public class AnalysisSessionStore {
         return Optional.of(comp);
     }
 
+    public void saveInterviewPrep(InterviewPrepDTO prep) {
+        if (prep == null || prep.id() == null || prep.id().isBlank()) return;
+        ensureCapacity();
+        interviewPreps.put(prep.id(), prep);
+    }
+
+    public Optional<InterviewPrepDTO> getInterviewPrep(String prepId) {
+        if (prepId == null || prepId.isBlank()) return Optional.empty();
+        InterviewPrepDTO prep = interviewPreps.get(prepId);
+        if (prep == null) return Optional.empty();
+        Instant createdAt;
+        try {
+            createdAt = Instant.parse(prep.createdAt());
+        } catch (Exception e) {
+            createdAt = Instant.now();
+        }
+        if (Duration.between(createdAt, Instant.now()).toMillis() > ttlMillis) {
+            interviewPreps.remove(prepId);
+            prepResumeTexts.remove(prepId);
+            return Optional.empty();
+        }
+        return Optional.of(prep);
+    }
+
+    public void savePrepResumeText(String prepId, String resumeText) {
+        if (prepId == null || resumeText == null) return;
+        prepResumeTexts.put(prepId, resumeText);
+    }
+
+    public Optional<String> getPrepResumeText(String prepId) {
+        if (prepId == null) return Optional.empty();
+        return Optional.ofNullable(prepResumeTexts.get(prepId));
+    }
+
     public java.util.List<HistoryItemDTO> getRecentCompletedSessions() {
         cleanExpired();
         java.util.List<HistoryItemDTO> list = new java.util.ArrayList<>();
 
         for (FullSession s : sessions.values()) {
             if (s.getStatus() == AnalysisStatus.COMPLETED && s.getAnalysis() != null) {
-                if (s.getAnalysisId() == null || s.getAnalysisId().startsWith("cmp-") || "demo".equalsIgnoreCase(s.getAnalysisId())) {
+                if (s.getAnalysisId() == null || s.getAnalysisId().startsWith("cmp-") || s.getAnalysisId().startsWith("prep-") || "demo".equalsIgnoreCase(s.getAnalysisId())) {
                     continue;
                 }
                 list.add(new HistoryItemDTO(
@@ -337,9 +373,27 @@ public class AnalysisSessionStore {
             ));
         }
 
+        for (InterviewPrepDTO prep : interviewPreps.values()) {
+            if (prep.id() == null || "demo".equalsIgnoreCase(prep.id()) || prep.isUnreadable()) {
+                continue;
+            }
+            list.add(new HistoryItemDTO(
+                    prep.id(),
+                    "INTERVIEW_PREP",
+                    prep.filename(),
+                    prep.questionCount(),
+                    prep.createdAt(),
+                    "INTERVIEW_PREP",
+                    null,
+                    null,
+                    prep.overallPreparationNote(),
+                    null
+            ));
+        }
+
         list.sort((a, b) -> b.createdAt().compareTo(a.createdAt()));
-        if (list.size() > 20) {
-            return list.subList(0, 20);
+        if (list.size() > 30) {
+            return list.subList(0, 30);
         }
         return list;
     }
@@ -347,10 +401,12 @@ public class AnalysisSessionStore {
     public void clear() {
         sessions.clear();
         comparisons.clear();
+        interviewPreps.clear();
+        prepResumeTexts.clear();
     }
 
     /**
-     * Clears user-visible history records (completed sessions and comparisons).
+     * Clears user-visible history records (completed sessions, comparisons, and interview prep).
      * Active processing sessions are preserved.
      */
     public void clearHistory() {
@@ -362,6 +418,11 @@ public class AnalysisSessionStore {
             ResumeComparisonDTO comp = entry.getValue();
             return comp == null || !"demo".equalsIgnoreCase(comp.comparisonId());
         });
+        interviewPreps.entrySet().removeIf(entry -> {
+            InterviewPrepDTO prep = entry.getValue();
+            return prep == null || !"demo".equalsIgnoreCase(prep.id());
+        });
+        prepResumeTexts.keySet().removeIf(id -> !interviewPreps.containsKey(id));
     }
 
     private void ensureCapacity() {
@@ -375,6 +436,14 @@ public class AnalysisSessionStore {
             Iterator<String> it = comparisons.keySet().iterator();
             if (it.hasNext()) {
                 comparisons.remove(it.next());
+            }
+        }
+        if (interviewPreps.size() >= maxSessions) {
+            Iterator<String> it = interviewPreps.keySet().iterator();
+            if (it.hasNext()) {
+                String removedId = it.next();
+                interviewPreps.remove(removedId);
+                prepResumeTexts.remove(removedId);
             }
         }
     }
@@ -391,5 +460,18 @@ public class AnalysisSessionStore {
                 return false;
             }
         });
+        interviewPreps.entrySet().removeIf(entry -> {
+            try {
+                Instant created = Instant.parse(entry.getValue().createdAt());
+                boolean expired = Duration.between(created, now).toMillis() > ttlMillis;
+                if (expired) {
+                    prepResumeTexts.remove(entry.getKey());
+                }
+                return expired;
+            } catch (Exception e) {
+                return false;
+            }
+        });
+        prepResumeTexts.keySet().removeIf(id -> !interviewPreps.containsKey(id));
     }
 }

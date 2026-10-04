@@ -1,5 +1,6 @@
 package com.resumeanalyzer.resume_analyzer;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
@@ -240,6 +241,117 @@ public class FallbackAIService implements AIProvider {
                     return new AIComparisonResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=comparison failed errorType={}",
+                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                    throw fallbackEx;
+                }
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public InterviewPrepDTO generateInterviewPrep(
+            String resumeText,
+            String prepId,
+            String filename,
+            Consumer<String> progress
+    ) {
+        return generateInterviewPrepWithProvider(resumeText, prepId, filename, progress).prep();
+    }
+
+    @Override
+    public AIInterviewPrepResult generateInterviewPrepWithProvider(
+            String resumeText,
+            String prepId,
+            String filename,
+            Consumer<String> progress
+    ) {
+        try {
+            InterviewPrepDTO result = primaryProvider.generateInterviewPrep(resumeText, prepId, filename, progress);
+            return new AIInterviewPrepResult(result, resolveProviderName(primaryProvider, "gemini"));
+        } catch (Exception e) {
+            if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
+                String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
+                        ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
+                logger.warn("provider={} operation=interview_prep fallback={} category={}",
+                        resolveProviderName(primaryProvider, "gemini"),
+                        resolveProviderName(fallbackProvider, "groq"),
+                        categoryName);
+                try {
+                    InterviewPrepDTO fallbackResult = fallbackProvider.generateInterviewPrep(resumeText, prepId, filename, progress);
+                    logger.info("provider={} operation=interview_prep success=true", resolveProviderName(fallbackProvider, "groq"));
+                    return new AIInterviewPrepResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                } catch (Exception fallbackEx) {
+                    logger.error("provider={} operation=interview_prep failed errorType={}",
+                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                    throw fallbackEx;
+                }
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public List<InterviewQuestionDTO> generateMoreQuestions(
+            String resumeText,
+            List<String> existingQuestions
+    ) {
+        try {
+            return primaryProvider.generateMoreQuestions(resumeText, existingQuestions);
+        } catch (Exception e) {
+            if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
+                String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
+                        ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
+                logger.warn("provider={} operation=generate_more_questions fallback={} category={}",
+                        resolveProviderName(primaryProvider, "gemini"),
+                        resolveProviderName(fallbackProvider, "groq"),
+                        categoryName);
+                try {
+                    List<InterviewQuestionDTO> fallbackResult = fallbackProvider.generateMoreQuestions(resumeText, existingQuestions);
+                    logger.info("provider={} operation=generate_more_questions success=true", resolveProviderName(fallbackProvider, "groq"));
+                    return fallbackResult;
+                } catch (Exception fallbackEx) {
+                    logger.error("provider={} operation=generate_more_questions failed errorType={}",
+                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                    throw fallbackEx;
+                }
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public InterviewAnswerEvaluationDTO evaluateAnswer(
+            String question,
+            String basedOn,
+            String userAnswer
+    ) {
+        return evaluateAnswerWithProvider(question, basedOn, userAnswer).evaluation();
+    }
+
+    @Override
+    public AIAnswerEvaluationResult evaluateAnswerWithProvider(
+            String question,
+            String basedOn,
+            String userAnswer
+    ) {
+        try {
+            InterviewAnswerEvaluationDTO result = primaryProvider.evaluateAnswer(question, basedOn, userAnswer);
+            return new AIAnswerEvaluationResult(result, resolveProviderName(primaryProvider, "gemini"));
+        } catch (Exception e) {
+            if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
+                String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
+                        ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
+                logger.warn("provider={} operation=evaluate_answer fallback={} category={}",
+                        resolveProviderName(primaryProvider, "gemini"),
+                        resolveProviderName(fallbackProvider, "groq"),
+                        categoryName);
+                try {
+                    InterviewAnswerEvaluationDTO fallbackResult = fallbackProvider.evaluateAnswer(question, basedOn, userAnswer);
+                    logger.info("provider={} operation=evaluate_answer success=true", resolveProviderName(fallbackProvider, "groq"));
+                    return new AIAnswerEvaluationResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                } catch (Exception fallbackEx) {
+                    logger.error("provider={} operation=evaluate_answer failed errorType={}",
                             resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }

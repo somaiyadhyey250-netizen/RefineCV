@@ -38,6 +38,7 @@
           <a href="/history" class="nav-link">History</a>
           <a href="/analyze" class="nav-link">Analyze</a>
           <a href="/compare" class="nav-link">Compare</a>
+          <a href="/interview-prep" class="nav-link">Interview Prep</a>
         </nav>
 
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch theme">
@@ -59,8 +60,9 @@
         <a href="#what-you-get" class="mobile-nav-link">What you get</a>
         <a href="#how-it-works" class="mobile-nav-link">How it works</a>
         <a href="/history" class="mobile-nav-link">History</a>
-        <a href="/analyze" class="mobile-nav-link mobile-nav-cta">Analyze Resume &rarr;</a>
-        <a href="/compare" class="mobile-nav-link mobile-nav-cta">Compare Resumes &rarr;</a>
+        <a href="/analyze" class="mobile-nav-link">Analyze Resume</a>
+        <a href="/compare" class="mobile-nav-link">Compare Resumes</a>
+        <a href="/interview-prep" class="mobile-nav-link mobile-nav-cta">Interview Prep &rarr;</a>
       </div>
     </nav>
   </header>
@@ -73,14 +75,18 @@
           <h1>Find out what is holding your resume back.</h1>
           <p class="lede">Upload your resume as a PDF. RefineCV reads it, scores it against recruiter standards, and gives you an actionable list of edits to make before you apply.</p>
 
-          <div class="hero-actions hero-dual-actions">
+          <div class="hero-actions hero-tri-actions">
             <div class="hero-action-box">
-              <a href="/analyze" class="btn btn-primary">Analyze My Resume &rarr;</a>
+              <a href="/analyze" class="btn btn-primary">Analyze Resume &rarr;</a>
               <span class="hero-action-caption">Understand what is working and what needs attention.</span>
             </div>
             <div class="hero-action-box">
               <a href="/compare" class="btn btn-primary">Compare Resumes &rarr;</a>
               <span class="hero-action-caption">Compare two resumes and see which is stronger and why.</span>
+            </div>
+            <div class="hero-action-box">
+              <a href="/interview-prep" class="btn btn-primary">Interview Prep &rarr;</a>
+              <span class="hero-action-caption">Prepare to defend claims and answer questions your CV invites.</span>
             </div>
           </div>
 
@@ -88,7 +94,7 @@
             <li>Objective scoring</li>
             <li>ATS layout check</li>
             <li>Skill gap analysis</li>
-            <li>Targeted job matching</li>
+            <li>Interview question prediction</li>
           </ul>
         </div>
 
@@ -167,30 +173,49 @@
       </div>
     </section>
 
-    <!-- Two Analysis Modes -->
+    <!-- Three Platform Tools Showcase -->
     <section class="band reveal-on-scroll">
       <div class="wrap">
-        <h2>Two evaluation modes tailored to your job search</h2>
-        <div class="modes-showcase">
+        <h2>Three intelligence tools tailored to your job search</h2>
+        <div class="modes-showcase" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
           <div class="mode-card-preview">
-            <h3>General Review</h3>
+            <h3>Analyze Resume</h3>
             <p>A comprehensive diagnostic review of your resume's overall strength, skill coverage, ATS readiness, and formatting clarity.</p>
             <ul>
               <li>Overall score out of 100 with milestone ruler</li>
-              <li>Strongest skills identified vs notable skill gaps</li>
+              <li>General Diagnostic and Specific Job Matching modes</li>
               <li>Strengths and weaknesses audit</li>
               <li>Prioritized edit checklist</li>
             </ul>
+            <div style="margin-top: 16px;">
+              <a href="/analyze" class="btn btn-quiet btn-sm">Analyze Resume &rarr;</a>
+            </div>
           </div>
           <div class="mode-card-preview">
-            <h3>Specific Job Match</h3>
-            <p>Target your resume directly against an open role description or industry context (such as "banking sector" or "Java Developer").</p>
+            <h3>Compare Resumes</h3>
+            <p>Compare two resumes head-to-head with objective category scoring to identify the superior candidate profile.</p>
             <ul>
-              <li>Job match percentage and role fit score</li>
-              <li>Keyword alignment against job requirements</li>
-              <li>Experience and scope alignment</li>
-              <li>Targeted skill recommendations for that position</li>
+              <li>Category-by-category breakdown</li>
+              <li>Clear winner verdict with factual justification</li>
+              <li>Score difference analysis</li>
+              <li>Side-by-side strengths and weaknesses</li>
             </ul>
+            <div style="margin-top: 16px;">
+              <a href="/compare" class="btn btn-quiet btn-sm">Compare Resumes &rarr;</a>
+            </div>
+          </div>
+          <div class="mode-card-preview">
+            <h3>Interview Prep from CV</h3>
+            <p>Anticipate the exact questions interviewers will ask from your background and identify claims you must be ready to defend.</p>
+            <ul>
+              <li>6–8 grounded questions mapped to actual resume claims</li>
+              <li>Depth, Proof, and Why question categories</li>
+              <li>Risk levels (Safe, Be Ready, Needs Strong Defense)</li>
+              <li>Claims to Prepare list &amp; optional practice evaluation</li>
+            </ul>
+            <div style="margin-top: 16px;">
+              <a href="/interview-prep" class="btn btn-quiet btn-sm">Interview Prep &rarr;</a>
+            </div>
           </div>
         </div>
       </div>
@@ -198,12 +223,13 @@
 
     <!-- Bottom CTA -->
     <section class="band band-alt reveal-on-scroll" style="text-align: center; padding: 88px 0;">
-      <div class="wrap" style="max-width: 680px;">
+      <div class="wrap" style="max-width: 740px;">
         <h2 style="margin-bottom: 16px;">Ready to refine your resume?</h2>
-        <p class="lede" style="margin: 0 auto 32px;">Takes less than a minute. Upload your PDF and get immediate, objective feedback or compare two resumes side by side.</p>
+        <p class="lede" style="margin: 0 auto 32px;">Takes less than a minute. Upload your PDF and get immediate, objective feedback, compare resumes, or prepare for interviews.</p>
         <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
-          <a href="/analyze" class="btn btn-primary" style="padding: 14px 28px; font-size: 1.05rem;">Analyze My Resume &rarr;</a>
+          <a href="/analyze" class="btn btn-primary" style="padding: 14px 28px; font-size: 1.05rem;">Analyze Resume &rarr;</a>
           <a href="/compare" class="btn btn-primary" style="padding: 14px 28px; font-size: 1.05rem;">Compare Resumes &rarr;</a>
+          <a href="/interview-prep" class="btn btn-primary" style="padding: 14px 28px; font-size: 1.05rem;">Interview Prep &rarr;</a>
         </div>
       </div>
     </section>

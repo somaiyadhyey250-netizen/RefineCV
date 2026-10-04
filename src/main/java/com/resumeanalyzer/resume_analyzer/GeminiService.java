@@ -400,6 +400,224 @@ public class GeminiService implements AIProvider {
         );
     }
 
+    @Override
+    public InterviewPrepDTO generateInterviewPrep(
+            String resumeText,
+            String prepId,
+            String filename,
+            Consumer<String> progress
+    ) {
+        if (!isAvailable()) {
+            throw new GeminiCommunicationException("Gemini is not configured.", null);
+        }
+
+        Client client;
+        try {
+            client = Client.builder().apiKey(apiKey).build();
+        } catch (RuntimeException e) {
+            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
+        }
+
+        Schema questionSchema = Schema.builder()
+                .type("OBJECT")
+                .properties(Map.of(
+                        "question", Schema.builder().type("STRING").build(),
+                        "questionType", Schema.builder().type("STRING").build(),
+                        "riskLevel", Schema.builder().type("STRING").build(),
+                        "basedOn", Schema.builder().type("STRING").build(),
+                        "interviewerIntent", Schema.builder().type("STRING").build(),
+                        "preparationHint", Schema.builder().type("STRING").build()
+                ))
+                .required(List.of("question", "questionType", "riskLevel", "basedOn", "interviewerIntent", "preparationHint"))
+                .build();
+
+        Schema claimSchema = Schema.builder()
+                .type("OBJECT")
+                .properties(Map.of(
+                        "claim", Schema.builder().type("STRING").build(),
+                        "riskLevel", Schema.builder().type("STRING").build(),
+                        "preparationNote", Schema.builder().type("STRING").build()
+                ))
+                .required(List.of("claim", "riskLevel", "preparationNote"))
+                .build();
+
+        Schema prepSchema = Schema.builder()
+                .type("OBJECT")
+                .properties(Map.of(
+                        "questions", Schema.builder().type("ARRAY").items(questionSchema).build(),
+                        "claimsToPrepare", Schema.builder().type("ARRAY").items(claimSchema).build(),
+                        "overallPreparationNote", Schema.builder().type("STRING").build()
+                ))
+                .required(List.of("questions", "claimsToPrepare", "overallPreparationNote"))
+                .build();
+
+        String prompt = AIPromptBuilder.buildInterviewPrepPrompt(resumeText);
+
+        GenerateContentConfig config = GenerateContentConfig.builder()
+                .responseMimeType("application/json")
+                .responseSchema(prepSchema)
+                .build();
+
+        if (progress != null) {
+            progress.accept("generating");
+        }
+
+        GenerateContentResponse response;
+        try {
+            response = client.models.generateContent(
+                    model,
+                    prompt,
+                    config
+            );
+        } catch (RuntimeException e) {
+            boolean isRateLimit = isRateLimitError(e);
+            throw new GeminiCommunicationException(
+                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini interview prep request failed.",
+                    e,
+                    isRateLimit
+            );
+        }
+
+        String result = response == null ? null : response.text();
+        return AIResponseParser.parseAndValidateInterviewPrep(
+                result,
+                prepId,
+                filename,
+                maxResponseCharacters,
+                objectMapper,
+                "gemini"
+        );
+    }
+
+    @Override
+    public List<InterviewQuestionDTO> generateMoreQuestions(
+            String resumeText,
+            List<String> existingQuestions
+    ) {
+        if (!isAvailable()) {
+            throw new GeminiCommunicationException("Gemini is not configured.", null);
+        }
+
+        Client client;
+        try {
+            client = Client.builder().apiKey(apiKey).build();
+        } catch (RuntimeException e) {
+            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
+        }
+
+        Schema questionSchema = Schema.builder()
+                .type("OBJECT")
+                .properties(Map.of(
+                        "question", Schema.builder().type("STRING").build(),
+                        "questionType", Schema.builder().type("STRING").build(),
+                        "riskLevel", Schema.builder().type("STRING").build(),
+                        "basedOn", Schema.builder().type("STRING").build(),
+                        "interviewerIntent", Schema.builder().type("STRING").build(),
+                        "preparationHint", Schema.builder().type("STRING").build()
+                ))
+                .required(List.of("question", "questionType", "riskLevel", "basedOn", "interviewerIntent", "preparationHint"))
+                .build();
+
+        Schema additionalSchema = Schema.builder()
+                .type("OBJECT")
+                .properties(Map.of(
+                        "questions", Schema.builder().type("ARRAY").items(questionSchema).build()
+                ))
+                .required(List.of("questions"))
+                .build();
+
+        String prompt = AIPromptBuilder.buildGenerateMoreQuestionsPrompt(resumeText, existingQuestions);
+
+        GenerateContentConfig config = GenerateContentConfig.builder()
+                .responseMimeType("application/json")
+                .responseSchema(additionalSchema)
+                .build();
+
+        GenerateContentResponse response;
+        try {
+            response = client.models.generateContent(
+                    model,
+                    prompt,
+                    config
+            );
+        } catch (RuntimeException e) {
+            boolean isRateLimit = isRateLimitError(e);
+            throw new GeminiCommunicationException(
+                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini generate more questions request failed.",
+                    e,
+                    isRateLimit
+            );
+        }
+
+        String result = response == null ? null : response.text();
+        return AIResponseParser.parseAndValidateAdditionalQuestions(
+                result,
+                maxResponseCharacters,
+                objectMapper,
+                "gemini"
+        );
+    }
+
+    @Override
+    public InterviewAnswerEvaluationDTO evaluateAnswer(
+            String question,
+            String basedOn,
+            String userAnswer
+    ) {
+        if (!isAvailable()) {
+            throw new GeminiCommunicationException("Gemini is not configured.", null);
+        }
+
+        Client client;
+        try {
+            client = Client.builder().apiKey(apiKey).build();
+        } catch (RuntimeException e) {
+            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
+        }
+
+        Schema evalSchema = Schema.builder()
+                .type("OBJECT")
+                .properties(Map.of(
+                        "answerQuality", Schema.builder().type("STRING").build(),
+                        "strengths", Schema.builder().type("ARRAY").items(Schema.builder().type("STRING").build()).build(),
+                        "improvements", Schema.builder().type("ARRAY").items(Schema.builder().type("STRING").build()).build()
+                ))
+                .required(List.of("answerQuality", "strengths", "improvements"))
+                .build();
+
+        String prompt = AIPromptBuilder.buildAnswerEvaluationPrompt(question, basedOn, userAnswer);
+
+        GenerateContentConfig config = GenerateContentConfig.builder()
+                .responseMimeType("application/json")
+                .responseSchema(evalSchema)
+                .build();
+
+        GenerateContentResponse response;
+        try {
+            response = client.models.generateContent(
+                    model,
+                    prompt,
+                    config
+            );
+        } catch (RuntimeException e) {
+            boolean isRateLimit = isRateLimitError(e);
+            throw new GeminiCommunicationException(
+                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini answer evaluation request failed.",
+                    e,
+                    isRateLimit
+            );
+        }
+
+        String result = response == null ? null : response.text();
+        return AIResponseParser.parseAndValidateAnswerEvaluation(
+                result,
+                "evaluated",
+                maxResponseCharacters,
+                objectMapper,
+                "gemini"
+        );
+    }
+
     private static boolean isRateLimitError(Throwable e) {
         if (e == null) return false;
         String message = e.getMessage();

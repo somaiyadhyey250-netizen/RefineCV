@@ -476,4 +476,210 @@ public class GroqAIProvider implements AIProvider {
                 "additionalProperties", false
         );
     }
+
+    @Override
+    public InterviewPrepDTO generateInterviewPrep(
+            String resumeText,
+            String prepId,
+            String filename,
+            Consumer<String> progress
+    ) {
+        if (!isAvailable()) {
+            throw new AICommunicationException(getProviderName(), AIErrorCategory.AUTHENTICATION_FAILURE,
+                    "Groq is not configured with an API key.", false, null);
+        }
+
+        String prompt = AIPromptBuilder.buildInterviewPrepPrompt(resumeText);
+
+        Map<String, Object> requestBody = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", "You are an expert AI Technical Interviewer. Output strictly valid JSON matching the schema."),
+                        Map.of("role", "user", "content", prompt)
+                ),
+                "response_format", Map.of(
+                        "type", "json_schema",
+                        "json_schema", Map.of(
+                                "name", "interview_prep",
+                                "strict", true,
+                                "schema", buildInterviewPrepJsonSchema()
+                        )
+                ),
+                "temperature", 0.2,
+                "max_completion_tokens", 8192
+        );
+
+        if (progress != null) {
+            progress.accept("generating");
+        }
+
+        String responseContent = executeChatCompletion(requestBody, "interview_prep");
+
+        return AIResponseParser.parseAndValidateInterviewPrep(
+                responseContent,
+                prepId,
+                filename,
+                maxResponseCharacters,
+                objectMapper,
+                getProviderName()
+        );
+    }
+
+    @Override
+    public List<InterviewQuestionDTO> generateMoreQuestions(
+            String resumeText,
+            List<String> existingQuestions
+    ) {
+        if (!isAvailable()) {
+            throw new AICommunicationException(getProviderName(), AIErrorCategory.AUTHENTICATION_FAILURE,
+                    "Groq is not configured with an API key.", false, null);
+        }
+
+        String prompt = AIPromptBuilder.buildGenerateMoreQuestionsPrompt(resumeText, existingQuestions);
+
+        Map<String, Object> requestBody = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", "You are an expert AI Technical Interviewer. Output strictly valid JSON matching the schema."),
+                        Map.of("role", "user", "content", prompt)
+                ),
+                "response_format", Map.of(
+                        "type", "json_schema",
+                        "json_schema", Map.of(
+                                "name", "more_questions",
+                                "strict", true,
+                                "schema", buildMoreQuestionsJsonSchema()
+                        )
+                ),
+                "temperature", 0.2,
+                "max_completion_tokens", 4096
+        );
+
+        String responseContent = executeChatCompletion(requestBody, "generate_more_questions");
+
+        return AIResponseParser.parseAndValidateAdditionalQuestions(
+                responseContent,
+                maxResponseCharacters,
+                objectMapper,
+                getProviderName()
+        );
+    }
+
+    @Override
+    public InterviewAnswerEvaluationDTO evaluateAnswer(
+            String question,
+            String basedOn,
+            String userAnswer
+    ) {
+        if (!isAvailable()) {
+            throw new AICommunicationException(getProviderName(), AIErrorCategory.AUTHENTICATION_FAILURE,
+                    "Groq is not configured with an API key.", false, null);
+        }
+
+        String prompt = AIPromptBuilder.buildAnswerEvaluationPrompt(question, basedOn, userAnswer);
+
+        Map<String, Object> requestBody = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", "You are an expert constructive interview coach. Output strictly valid JSON matching the schema."),
+                        Map.of("role", "user", "content", prompt)
+                ),
+                "response_format", Map.of(
+                        "type", "json_schema",
+                        "json_schema", Map.of(
+                                "name", "answer_evaluation",
+                                "strict", true,
+                                "schema", buildAnswerEvaluationJsonSchema()
+                        )
+                ),
+                "temperature", 0.2,
+                "max_completion_tokens", 4096
+        );
+
+        String responseContent = executeChatCompletion(requestBody, "answer_evaluation");
+
+        return AIResponseParser.parseAndValidateAnswerEvaluation(
+                responseContent,
+                "evaluated",
+                maxResponseCharacters,
+                objectMapper,
+                getProviderName()
+        );
+    }
+
+    private Map<String, Object> buildInterviewPrepJsonSchema() {
+        Map<String, Object> questionItem = Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "question", Map.of("type", "string"),
+                        "questionType", Map.of("type", "string"),
+                        "riskLevel", Map.of("type", "string"),
+                        "basedOn", Map.of("type", "string"),
+                        "interviewerIntent", Map.of("type", "string"),
+                        "preparationHint", Map.of("type", "string")
+                ),
+                "required", List.of("question", "questionType", "riskLevel", "basedOn", "interviewerIntent", "preparationHint"),
+                "additionalProperties", false
+        );
+
+        Map<String, Object> claimItem = Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "claim", Map.of("type", "string"),
+                        "riskLevel", Map.of("type", "string"),
+                        "preparationNote", Map.of("type", "string")
+                ),
+                "required", List.of("claim", "riskLevel", "preparationNote"),
+                "additionalProperties", false
+        );
+
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "questions", Map.of("type", "array", "items", questionItem),
+                        "claimsToPrepare", Map.of("type", "array", "items", claimItem),
+                        "overallPreparationNote", Map.of("type", "string")
+                ),
+                "required", List.of("questions", "claimsToPrepare", "overallPreparationNote"),
+                "additionalProperties", false
+        );
+    }
+
+    private Map<String, Object> buildMoreQuestionsJsonSchema() {
+        Map<String, Object> questionItem = Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "question", Map.of("type", "string"),
+                        "questionType", Map.of("type", "string"),
+                        "riskLevel", Map.of("type", "string"),
+                        "basedOn", Map.of("type", "string"),
+                        "interviewerIntent", Map.of("type", "string"),
+                        "preparationHint", Map.of("type", "string")
+                ),
+                "required", List.of("question", "questionType", "riskLevel", "basedOn", "interviewerIntent", "preparationHint"),
+                "additionalProperties", false
+        );
+
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "questions", Map.of("type", "array", "items", questionItem)
+                ),
+                "required", List.of("questions"),
+                "additionalProperties", false
+        );
+    }
+
+    private Map<String, Object> buildAnswerEvaluationJsonSchema() {
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "answerQuality", Map.of("type", "string"),
+                        "strengths", Map.of("type", "array", "items", Map.of("type", "string")),
+                        "improvements", Map.of("type", "array", "items", Map.of("type", "string"))
+                ),
+                "required", List.of("answerQuality", "strengths", "improvements"),
+                "additionalProperties", false
+        );
+    }
 }

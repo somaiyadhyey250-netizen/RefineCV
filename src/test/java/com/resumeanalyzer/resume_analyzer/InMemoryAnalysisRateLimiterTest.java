@@ -37,4 +37,15 @@ class InMemoryAnalysisRateLimiterTest {
         assertFalse(limiter.tryAcquire("client-b"));
         assertFalse(limiter.tryAcquire(" "));
     }
+
+    @Test
+    void allowsTenRequestsInNewBaselineWindowAndRejectsEleventh() {
+        InMemoryAnalysisRateLimiter limiter =
+                new InMemoryAnalysisRateLimiter(10, Duration.ofMinutes(15), 10000);
+
+        for (int i = 1; i <= 10; i++) {
+            assertTrue(limiter.tryAcquire("127.0.0.1"), "Request " + i + " should be allowed");
+        }
+        assertFalse(limiter.tryAcquire("127.0.0.1"), "11th request should be rejected by 10/15m rate limit");
+    }
 }

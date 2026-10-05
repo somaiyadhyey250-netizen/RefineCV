@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local/project documentation and assets
+REFINECV_AUDIT.md
+REFINECV_V3_ARCHITECTURE_AUDIT.md
+RefineCV_Brand_Assets.zip
+RefineCV_Current_UI.pdf
+sample_resume.pdf

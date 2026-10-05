@@ -541,9 +541,11 @@ public class ResumeController {
             sessionStore.failSession(state.getAnalysisId(), AnalysisErrorMessages.forException(e));
             finishError(emitter, state, AnalysisErrorMessages.forException(e));
         } catch (ResumeProcessingException e) {
-            logger.error("analysis_failed analysisId={} stage={} category={} causeType={} durationMs={}",
+            String causeType = e.getCause() == null ? "none" : e.getCause().getClass().getName();
+            String causeMessage = e.getCause() == null ? "none" : e.getCause().getMessage();
+            logger.error("analysis_failed analysisId={} stage={} category={} causeType={} causeMessage=\"{}\" durationMs={}",
                     state.getAnalysisId(), e.getStage(), AnalysisErrorMessages.Category.PROCESSING,
-                    e.getCause() == null ? "none" : e.getCause().getClass().getName(), state.elapsedMillis());
+                    causeType, causeMessage, state.elapsedMillis(), e);
             sessionStore.failSession(state.getAnalysisId(), AnalysisErrorMessages.forException(e));
             finishError(emitter, state, AnalysisErrorMessages.forException(e));
         } catch (Exception e) {

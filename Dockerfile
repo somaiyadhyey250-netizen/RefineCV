@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # Stage 1: Build stage
-FROM eclipse-temurin:21-jdk-jammy AS builder
+FROM eclipse-temurin:21-jdk-noble AS builder
 WORKDIR /build
 
 # Copy Maven wrapper and configuration
@@ -23,13 +23,14 @@ COPY tessdata tessdata
 RUN ./mvnw clean package -DskipTests
 
 # Stage 2: Production Runtime stage
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:21-jre-noble
 WORKDIR /app
 
 # Install native Tesseract OCR and English language dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     libtesseract-dev \
+    libleptonica-dev \
     tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 

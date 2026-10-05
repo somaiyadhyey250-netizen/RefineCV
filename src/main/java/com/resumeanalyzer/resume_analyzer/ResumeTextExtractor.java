@@ -6,6 +6,8 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
@@ -21,6 +23,8 @@ import net.sourceforge.tess4j.TesseractException;
 
 @Service
 public class ResumeTextExtractor {
+
+    private static final Logger logger = LoggerFactory.getLogger(ResumeTextExtractor.class);
 
     private final int maxPdfPages;
     private final int maxExtractedTextCharacters;
@@ -234,8 +238,9 @@ public class ResumeTextExtractor {
                 try {
                     pageText = tesseract.doOCR(image);
                 } catch (RuntimeException | LinkageError e) {
+                    logger.error("OCR doOCR failed on page {}: {}", page, e.getMessage(), e);
                     throw new ResumeProcessingException(ResumeProcessingException.Stage.OCR,
-                            new IOException("OCR engine could not process the page.", e));
+                            new IOException("OCR engine could not process page " + page + ": " + e.getMessage(), e));
                 } finally {
                     image.flush();
                 }
@@ -266,6 +271,7 @@ public class ResumeTextExtractor {
         ) {
 
 
+            logger.error("OCR extraction failed: {}", e.getMessage(), e);
             throw new ResumeProcessingException(ResumeProcessingException.Stage.OCR, e);
 
         }
@@ -280,8 +286,9 @@ public class ResumeTextExtractor {
             tesseract.setLanguage("eng");
             return tesseract;
         } catch (RuntimeException | LinkageError e) {
+            logger.error("OCR createTesseract failed: {}", e.getMessage(), e);
             throw new ResumeProcessingException(ResumeProcessingException.Stage.OCR,
-                    new IOException("OCR engine could not be initialized.", e));
+                    new IOException("OCR engine could not be initialized: " + e.getMessage(), e));
         }
     }
 
@@ -301,8 +308,9 @@ public class ResumeTextExtractor {
             }
             return dataDirectory;
         } catch (IOException | InvalidPathException | SecurityException e) {
+            logger.error("OCR resolveTessdataDirectory failed: {}", e.getMessage(), e);
             throw new ResumeProcessingException(ResumeProcessingException.Stage.OCR,
-                    new IOException("OCR language data is unavailable."));
+                    new IOException("OCR language data is unavailable: " + e.getMessage(), e));
         }
     }
 

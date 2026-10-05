@@ -63,6 +63,17 @@ class ResumeTextExtractorTest {
     }
 
     @Test
+    void testBlankPageTriggersOcrExecution() throws Exception {
+        java.util.List<String> progress = new java.util.ArrayList<>();
+        ResumeValidationException exception = assertThrows(
+                ResumeValidationException.class,
+                () -> extractor.extractText(pdfWithPages(1), progress::add)
+        );
+        assertEquals(ResumeValidationException.Reason.NO_READABLE_TEXT, exception.getReason());
+        assertTrue(progress.contains("ocr-complete"));
+    }
+
+    @Test
     void rejectsOversizedPageDimensionBeforeOcrAndUsesSafeErrorCategory() throws Exception {
         java.util.List<String> progress = new java.util.ArrayList<>();
         ResumeValidationException exception = assertThrows(

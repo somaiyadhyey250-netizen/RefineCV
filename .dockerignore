@@ -1,0 +1,29 @@
+# Git & IDE metadata
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+.dockerignore
+
+# Build output & dependencies
+target/
+*.class
+
+# Logs & temporary files
+*.log
+*.tmp
+*.temp
+
+# Local design & audit reference assets (never needed in container)
+REFINECV_AUDIT.md
+REFINECV_V3_ARCHITECTURE_AUDIT.md
+RefineCV_Brand_Assets.zip
+RefineCV_Current_UI.pdf
+sample_resume.pdf
+
+# Environment & credentials files
+.env
+.env.*
+*.key
+*.pem

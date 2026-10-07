@@ -55,6 +55,9 @@ class ResumeAnalysisIntegrationTest {
     @MockitoBean
     private GeminiService geminiService;
 
+    @MockitoBean
+    private GroqAIProvider groqAIProvider;
+
     @BeforeEach
     void waitForExecutorIdle() throws InterruptedException {
         var pool = executor.getThreadPoolExecutor();
@@ -68,7 +71,7 @@ class ResumeAnalysisIntegrationTest {
     void analysisRunsOnManagedExecutorAndEmitsSuccessfulTerminalEvent() throws Exception {
         AtomicReference<String> workerName = new AtomicReference<>();
         stubFastExtraction(workerName);
-        stubGeminiSuccess();
+        stubGroqSuccess();
 
         MvcResult started = mockMvc.perform(multipart("/analyze").file(upload()))
                 .andExpect(request().asyncStarted())
@@ -83,7 +86,8 @@ class ResumeAnalysisIntegrationTest {
         assertTrue(workerName.get().startsWith("resume-analysis-"));
         assertTrue(body.contains("event:result"));
         assertTrue(body.contains("\"score\":80"));
-        verify(geminiService).analyzeResume(eq("resume text"), any());
+        verify(groqAIProvider).analyzeResume(eq("resume text"), any());
+        verify(geminiService, org.mockito.Mockito.never()).analyzeResume(any(), any());
     }
 
     @Test
@@ -190,20 +194,23 @@ class ResumeAnalysisIntegrationTest {
     }
 
     @Test
-    void geminiCommunicationFailureDoesNotExposeProviderDetails() throws Exception {
+    void providerCommunicationFailureDoesNotExposeProviderDetails() throws Exception {
         stubFastExtraction(new AtomicReference<>());
-        when(geminiService.analyzeResume(eq("resume text"), any()))
-                .thenThrow(new GeminiCommunicationException("secret-api-key provider body", null));
+        when(groqAIProvider.analyzeResume(eq("resume text"), any()))
+                .thenThrow(new AICommunicationException("groq", AIErrorCategory.NETWORK_COMMUNICATION, "secret-api-key provider body", false, null));
 
         String body = performUploadAndReadSse();
 
         assertSafeError(body, "We couldn't complete the AI analysis. Please try again.");
-        assertTrue(!body.contains("secret-api-key") && !body.contains("GeminiCommunicationException"));
+        assertTrue(!body.contains("secret-api-key") && !body.contains("AICommunicationException"));
     }
 
     @Test
     void invalidGeminiResponseDoesNotExposeRawResponse() throws Exception {
         stubFastExtraction(new AtomicReference<>());
+        when(groqAIProvider.analyzeResume(eq("resume text"), any()))
+                .thenThrow(new AICommunicationException("groq", AIErrorCategory.RATE_QUOTA_EXHAUSTED, "Groq 429", true, null));
+        when(geminiService.isAvailable()).thenReturn(true);
         when(geminiService.analyzeResume(eq("resume text"), any()))
                 .thenThrow(new GeminiResponseException(GeminiResponseException.Reason.MALFORMED_JSON,
                         "RAW_GEMINI_RESPONSE {private-content}"));
@@ -212,6 +219,24 @@ class ResumeAnalysisIntegrationTest {
 
         assertSafeError(body, "We couldn't validate the AI analysis. Please try again.");
         assertTrue(!body.contains("RAW_GEMINI_RESPONSE") && !body.contains("private-content"));
+    }
+
+    @Test
+    void groqPrimaryRateLimitFallsBackToGeminiAndSucceeds() throws Exception {
+        stubFastExtraction(new AtomicReference<>());
+        when(groqAIProvider.analyzeResume(eq("resume text"), any()))
+                .thenThrow(new AICommunicationException("groq", AIErrorCategory.RATE_QUOTA_EXHAUSTED,
+                        "Groq rate limit exceeded (429)", true, null));
+        when(geminiService.isAvailable()).thenReturn(true);
+        stubGeminiSuccess();
+
+        String body = performUploadAndReadSse();
+
+        assertTrue(body.contains("ai-fallback"));
+        assertTrue(body.contains("event:result"));
+        assertTrue(body.contains("\"score\":80"));
+        verify(groqAIProvider).analyzeResume(eq("resume text"), any());
+        verify(geminiService).analyzeResume(eq("resume text"), any());
     }
 
     @Test
@@ -248,6 +273,18 @@ class ResumeAnalysisIntegrationTest {
             progress.accept("extracting");
             progress.accept("extracted");
             return "resume text";
+        });
+    }
+
+    private void stubGroqSuccess() {
+        when(groqAIProvider.analyzeResume(eq("resume text"), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<String> progress = invocation.getArgument(1);
+            progress.accept("ai-analysis");
+            progress.accept("recommendations");
+            return new ResumeAnalysisDTO(80, "Strong resume", List.of("Java"), List.of(),
+                    List.of("Clear experience"), List.of(), "Good", List.of("Add metrics"),
+                    List.of("Quantify impact"));
         });
     }
 

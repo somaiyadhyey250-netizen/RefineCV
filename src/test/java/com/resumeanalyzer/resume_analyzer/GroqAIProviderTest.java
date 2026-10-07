@@ -2,11 +2,13 @@ package com.resumeanalyzer.resume_analyzer;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -268,6 +270,58 @@ class GroqAIProviderTest {
         assertEquals(AIErrorCategory.RATE_QUOTA_EXHAUSTED, ex.getCategory());
         assertTrue(ex.isRateLimited());
         assertTrue(ex.isFallbackEligible());
+    }
+
+    @Test
+    @DisplayName("Groq 429 with small Retry-After performs quick retry and succeeds")
+    void groqRateLimitWithSmallRetryAfterRetriesOnceAndSucceeds() throws Exception {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> rateLimitResponse = org.mockito.Mockito.mock(HttpResponse.class);
+        when(rateLimitResponse.statusCode()).thenReturn(429);
+        when(rateLimitResponse.headers()).thenReturn(HttpHeaders.of(Map.of("Retry-After", List.of("0.02")), (a, b) -> true));
+
+        String validJson = """
+                {
+                  "score": 88,
+                  "summary": "Experienced engineer with strong background in backend systems.",
+                  "strongestSkills": ["Java", "Spring Boot"],
+                  "missingOrWeakSkills": ["AWS"],
+                  "strengths": ["Impact"],
+                  "weaknesses": ["None"],
+                  "atsCompatibility": "High",
+                  "suggestions": ["Add certs"],
+                  "recommendedChanges": ["Highlight cloud"]
+                }
+                """;
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> successResponse = org.mockito.Mockito.mock(HttpResponse.class);
+        when(successResponse.statusCode()).thenReturn(200);
+        when(successResponse.body()).thenReturn(createGroqResponseBody(validJson));
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(rateLimitResponse)
+                .thenReturn(successResponse);
+
+        ResumeAnalysisDTO dto = groqAIProvider.analyzeResume("resume text", status -> {});
+        assertNotNull(dto);
+        assertEquals(88, dto.score());
+    }
+
+    @Test
+    @DisplayName("Groq 429 with large Retry-After fails immediately with fallback-eligible exception")
+    void groqRateLimitWithLargeRetryAfterFailsFastWithoutRetry() throws Exception {
+        when(httpResponse.statusCode()).thenReturn(429);
+        when(httpResponse.headers()).thenReturn(HttpHeaders.of(Map.of("Retry-After", List.of("25.0")), (a, b) -> true));
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(httpResponse);
+
+        AICommunicationException ex = assertThrows(AICommunicationException.class, () ->
+                groqAIProvider.analyzeResume("resume text", status -> {}));
+
+        assertEquals(AIErrorCategory.RATE_QUOTA_EXHAUSTED, ex.getCategory());
+        assertTrue(ex.isRateLimited());
+        assertTrue(ex.isFallbackEligible());
+        verify(httpClient, org.mockito.Mockito.times(1)).send(any(), any());
     }
 
     @Test

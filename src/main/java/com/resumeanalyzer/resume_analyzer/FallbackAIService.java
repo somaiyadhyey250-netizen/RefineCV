@@ -29,7 +29,7 @@ public class FallbackAIService implements AIProvider {
     public FallbackAIService(
             GeminiService geminiService,
             GroqAIProvider groqAIProvider,
-            @Value("${refinecv.ai.primary-provider:gemini}") String preferredPrimary
+            @Value("${refinecv.ai.primary-provider:groq}") String preferredPrimary
     ) {
         if ("groq".equalsIgnoreCase(preferredPrimary)) {
             this.primaryProvider = Objects.requireNonNull(groqAIProvider, "groqAIProvider must not be null");

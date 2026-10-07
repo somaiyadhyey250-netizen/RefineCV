@@ -2,6 +2,8 @@ package com.resumeanalyzer.resume_analyzer;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -36,6 +38,9 @@ class ResumeImprovementEndpointTest {
 
     @MockitoBean
     private GeminiService geminiService;
+
+    @MockitoBean
+    private GroqAIProvider groqAIProvider;
 
     @MockitoBean
     private ResumeTextExtractor resumeTextExtractor;
@@ -74,7 +79,7 @@ class ResumeImprovementEndpointTest {
         String analysisId = "session-12345";
         sessionStore.put(analysisId, "Sample extracted resume text", sampleAnalysis);
 
-        when(geminiService.improveResume(eq("Sample extracted resume text"), any()))
+        when(groqAIProvider.improveResume(eq("Sample extracted resume text"), any()))
                 .thenReturn(sampleImprovement);
 
         MvcResult result = mockMvc.perform(post("/improve")
@@ -90,11 +95,14 @@ class ResumeImprovementEndpointTest {
                         .value("Optimized SQL queries and indexed high-volume tables to improve lookup times"))
                 .andExpect(jsonPath("$.bulletImprovements[0].section").value("Experience"))
                 .andExpect(jsonPath("$.improvementExplanations[0]").value("Replaced passive language with active verbs"));
+
+        verify(groqAIProvider).improveResume(eq("Sample extracted resume text"), any());
+        verify(geminiService, org.mockito.Mockito.never()).improveResume(any(), any());
     }
 
     @Test
     void improvementSucceedsWithDirectResumeTextAndAnalysis() throws Exception {
-        when(geminiService.improveResume(eq("Direct resume text"), any()))
+        when(groqAIProvider.improveResume(eq("Direct resume text"), any()))
                 .thenReturn(sampleImprovement);
 
         String payload = """
@@ -123,6 +131,9 @@ class ResumeImprovementEndpointTest {
         mockMvc.perform(asyncDispatch(result))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.improvedSummary").value(sampleImprovement.improvedSummary()));
+
+        verify(groqAIProvider).improveResume(eq("Direct resume text"), any());
+        verify(geminiService, org.mockito.Mockito.never()).improveResume(any(), any());
     }
 
     @Test
@@ -156,6 +167,8 @@ class ResumeImprovementEndpointTest {
         String analysisId = "session-err";
         sessionStore.put(analysisId, "Resume text", sampleAnalysis);
 
+        when(groqAIProvider.improveResume(any(), any()))
+                .thenThrow(new AICommunicationException("groq", AIErrorCategory.SERVICE_UNAVAILABLE, "Connection failed", false, null));
         when(geminiService.improveResume(any(), any()))
                 .thenThrow(new GeminiCommunicationException("Connection failed", null));
 

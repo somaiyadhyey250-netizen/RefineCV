@@ -57,6 +57,9 @@ class AnalysisRecoveryIntegrationTest {
     @MockitoBean
     private GeminiService geminiService;
 
+    @MockitoBean
+    private GroqAIProvider groqAIProvider;
+
     private final ResumeAnalysisDTO sampleAnalysis = new ResumeAnalysisDTO(
             88,
             "Experienced Java Backend Engineer",
@@ -78,8 +81,8 @@ class AnalysisRecoveryIntegrationTest {
     @DisplayName("1. Analysis completes and result is stored in AnalysisSessionStore")
     void analysisCompletesAndResultIsStored() throws Exception {
         when(resumeTextExtractor.extractText(any(), any())).thenReturn("Extracted resume text");
-        when(geminiService.analyzeResume(eq("Extracted resume text"), any())).thenReturn(sampleAnalysis);
-        when(geminiService.getProviderName()).thenReturn("gemini");
+        when(groqAIProvider.analyzeResume(eq("Extracted resume text"), any())).thenReturn(sampleAnalysis);
+        when(groqAIProvider.getProviderName()).thenReturn("groq");
 
         MockMultipartFile file = new MockMultipartFile("resume", "resume.pdf", "application/pdf", new byte[]{1, 2, 3});
 
@@ -100,7 +103,7 @@ class AnalysisRecoveryIntegrationTest {
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.result.score").value(88))
                 .andExpect(jsonPath("$.result.summary").value("Experienced Java Backend Engineer"))
-                .andExpect(jsonPath("$.provider").value("gemini"))
+                .andExpect(jsonPath("$.provider").value("groq"))
                 .andExpect(jsonPath("$.resumeText").doesNotExist()); // Verify raw resume text is NOT exposed
     }
 
@@ -119,9 +122,9 @@ class AnalysisRecoveryIntegrationTest {
             allowExtractionToFinish.await(2, TimeUnit.SECONDS);
             return "Resume content after simulated disconnect";
         });
-        when(geminiService.analyzeResume(eq("Resume content after simulated disconnect"), any()))
+        when(groqAIProvider.analyzeResume(eq("Resume content after simulated disconnect"), any()))
                 .thenReturn(sampleAnalysis);
-        when(geminiService.getProviderName()).thenReturn("gemini");
+        when(groqAIProvider.getProviderName()).thenReturn("groq");
 
         AnalysisRequestState state = new AnalysisRequestState();
         String analysisId = state.getAnalysisId();
@@ -161,15 +164,15 @@ class AnalysisRecoveryIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.result.score").value(88))
-                .andExpect(jsonPath("$.provider").value("gemini"));
+                .andExpect(jsonPath("$.provider").value("groq"));
     }
 
     @Test
     @DisplayName("3. Status endpoint returns FAILED safely when AI fails")
     void statusEndpointReturnsFailedSafely() throws Exception {
         when(resumeTextExtractor.extractText(any(), any())).thenReturn("Text");
-        when(geminiService.analyzeResume(any(), any()))
-                .thenThrow(new AICommunicationException("gemini", AIErrorCategory.SERVICE_UNAVAILABLE, "Gemini 503", false, null));
+        when(groqAIProvider.analyzeResume(any(), any()))
+                .thenThrow(new AICommunicationException("groq", AIErrorCategory.SERVICE_UNAVAILABLE, "Groq 503", false, null));
 
         MockMultipartFile file = new MockMultipartFile("resume", "resume.pdf", "application/pdf", new byte[]{1, 2, 3});
 

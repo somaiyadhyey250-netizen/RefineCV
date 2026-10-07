@@ -38,6 +38,9 @@ class ResumeRateLimitIntegrationTest {
     @MockitoBean
     private GeminiService geminiService;
 
+    @MockitoBean
+    private GroqAIProvider groqAIProvider;
+
     @Test
     void allowsNormalRequestThenRejectsExcessWithSafeSseMessage() throws Exception {
         when(resumeTextExtractor.extractText(any(byte[].class), any())).thenAnswer(invocation -> {
@@ -47,7 +50,7 @@ class ResumeRateLimitIntegrationTest {
             progress.accept("extracted");
             return "resume text";
         });
-        when(geminiService.analyzeResume(eq("resume text"), any()))
+        when(groqAIProvider.analyzeResume(eq("resume text"), any()))
                 .thenReturn(new ResumeAnalysisDTO(80, "Strong resume", List.of(), List.of(), List.of(),
                         List.of(), "Good", List.of(), List.of()));
 
@@ -58,7 +61,8 @@ class ResumeRateLimitIntegrationTest {
         assertTrue(rejectedBody.contains("event:error"));
         assertTrue(rejectedBody.contains("You're making requests too quickly"));
         assertTrue(!rejectedBody.contains("event:result"));
-        verify(geminiService).analyzeResume(eq("resume text"), any());
+        verify(groqAIProvider).analyzeResume(eq("resume text"), any());
+        verify(geminiService, org.mockito.Mockito.never()).analyzeResume(any(), any());
     }
 
     private String performUpload() throws Exception {

@@ -105,6 +105,51 @@ public class LiveProviderBenchmarkTest {
         }
     }
 
+    @Test
+    @EnabledIfEnvironmentVariable(named = "RUN_LIVE_BENCHMARK", matches = "true")
+    void runInterviewPrepBenchmark() throws Exception {
+        String groqKey = System.getenv("GROQ_API_KEY");
+        if (groqKey == null || groqKey.isBlank()) return;
+
+        GroqAIProvider groq = new GroqAIProvider(
+                groqKey, "openai/gpt-oss-20b", "https://api.groq.com/openai/v1",
+                Duration.ofSeconds(30), 20000
+        );
+        System.out.println("\n======================================================================");
+        System.out.println("TESTING INTERVIEW PREP OPERATIONS ON GROQ");
+        System.out.println("======================================================================");
+
+        // 6. Interview Prep Generation
+        long start = System.currentTimeMillis();
+        InterviewPrepDTO prep = groq.generateInterviewPrep(SAMPLE_RESUME_A, "prep-bench-1", "Alex_Mercer.pdf", status -> {});
+        long duration = System.currentTimeMillis() - start;
+        System.out.printf("[Groq] 6. Interview Prep Generation: SUCCESS in %d ms (Questions: %d, Claims: %d)%n",
+                duration, prep.questions() != null ? prep.questions().size() : 0, prep.claimsToPrepare() != null ? prep.claimsToPrepare().size() : 0);
+
+        Thread.sleep(4000);
+
+        // 7. Generate More Questions
+        start = System.currentTimeMillis();
+        List<InterviewQuestionDTO> moreQuestions = groq.generateMoreQuestions(SAMPLE_RESUME_A, List.of("What is your experience with Spring Boot?"));
+        duration = System.currentTimeMillis() - start;
+        System.out.printf("[Groq] 7. Generate More Questions: SUCCESS in %d ms (Questions: %d)%n",
+                duration, moreQuestions != null ? moreQuestions.size() : 0);
+
+        Thread.sleep(4000);
+
+        // 8. Evaluate Practice Answer
+        start = System.currentTimeMillis();
+        InterviewAnswerEvaluationDTO eval = groq.evaluateAnswer(
+                "Explain the high-throughput system you built.",
+                "Built high-throughput payment systems handling 15M requests daily.",
+                "I designed the payment gateway with Redis cache and Kafka queues, reducing p99 latency to 85ms."
+        );
+        duration = System.currentTimeMillis() - start;
+        System.out.printf("[Groq] 8. Evaluate Answer: SUCCESS in %d ms (Quality: %s, Strengths: %d, Improvements: %d)%n",
+                duration, eval.answerQuality() != null ? eval.answerQuality().substring(0, Math.min(30, eval.answerQuality().length())) : "N/A",
+                eval.strengths() != null ? eval.strengths().size() : 0, eval.improvements() != null ? eval.improvements().size() : 0);
+    }
+
     private void benchmarkProvider(String name, AIProvider provider) {
         // 1. General Analysis
         try {
@@ -115,6 +160,7 @@ public class LiveProviderBenchmarkTest {
                     name, duration, analysis.score());
 
             // 2. Specific Job Analysis
+            Thread.sleep(2500);
             start = System.currentTimeMillis();
             ResumeAnalysisDTO jobAnalysis = provider.analyzeResumeForJob(SAMPLE_RESUME_A, SAMPLE_JOB_DESC, status -> {});
             duration = System.currentTimeMillis() - start;
@@ -122,6 +168,7 @@ public class LiveProviderBenchmarkTest {
                     name, duration, jobAnalysis.jobMatchScore());
 
             // 3. Improvement
+            Thread.sleep(2500);
             start = System.currentTimeMillis();
             ResumeImprovementDTO improvement = provider.improveResume(SAMPLE_RESUME_A, analysis);
             duration = System.currentTimeMillis() - start;
@@ -129,6 +176,7 @@ public class LiveProviderBenchmarkTest {
                     name, duration, improvement.bulletImprovements() != null ? improvement.bulletImprovements().size() : 0);
 
             // 4. Comparison
+            Thread.sleep(2500);
             start = System.currentTimeMillis();
             ResumeComparisonDTO comparison = provider.compareResumes(
                     SAMPLE_RESUME_A, SAMPLE_RESUME_B, SAMPLE_JOB_DESC,
@@ -137,6 +185,43 @@ public class LiveProviderBenchmarkTest {
             duration = System.currentTimeMillis() - start;
             System.out.printf("[%s] 4. Comparison: SUCCESS in %d ms (Winner: %s, ScoreA: %d, ScoreB: %d)%n",
                     name, duration, comparison.winner(), comparison.totalScoreA(), comparison.totalScoreB());
+
+            // 5. Job-Targeted Improvement
+            Thread.sleep(2500);
+            start = System.currentTimeMillis();
+            ResumeImprovementDTO jobImprovement = provider.improveResumeForJob(SAMPLE_RESUME_A, analysis, SAMPLE_JOB_DESC);
+            duration = System.currentTimeMillis() - start;
+            System.out.printf("[%s] 5. Job-Targeted Improvement: SUCCESS in %d ms (Bullets improved: %d)%n",
+                    name, duration, jobImprovement.bulletImprovements() != null ? jobImprovement.bulletImprovements().size() : 0);
+
+            // 6. Interview Prep Generation
+            Thread.sleep(2500);
+            start = System.currentTimeMillis();
+            InterviewPrepDTO prep = provider.generateInterviewPrep(SAMPLE_RESUME_A, "prep-bench-1", "Alex_Mercer.pdf", status -> {});
+            duration = System.currentTimeMillis() - start;
+            System.out.printf("[%s] 6. Interview Prep Generation: SUCCESS in %d ms (Questions: %d, Claims: %d)%n",
+                    name, duration, prep.questions() != null ? prep.questions().size() : 0, prep.claimsToPrepare() != null ? prep.claimsToPrepare().size() : 0);
+
+            // 7. Generate More Questions
+            Thread.sleep(2500);
+            start = System.currentTimeMillis();
+            List<InterviewQuestionDTO> moreQuestions = provider.generateMoreQuestions(SAMPLE_RESUME_A, List.of("What is your experience with Spring Boot?"));
+            duration = System.currentTimeMillis() - start;
+            System.out.printf("[%s] 7. Generate More Questions: SUCCESS in %d ms (Questions: %d)%n",
+                    name, duration, moreQuestions != null ? moreQuestions.size() : 0);
+
+            // 8. Evaluate Practice Answer
+            Thread.sleep(2500);
+            start = System.currentTimeMillis();
+            InterviewAnswerEvaluationDTO eval = provider.evaluateAnswer(
+                    "Explain the high-throughput system you built.",
+                    "Built high-throughput payment systems handling 15M requests daily.",
+                    "I designed the payment gateway with Redis cache and Kafka queues, reducing p99 latency to 85ms."
+            );
+            duration = System.currentTimeMillis() - start;
+            System.out.printf("[%s] 8. Evaluate Answer: SUCCESS in %d ms (Quality: %s, Strengths: %d, Improvements: %d)%n",
+                    name, duration, eval.answerQuality() != null ? eval.answerQuality().substring(0, Math.min(30, eval.answerQuality().length())) : "N/A",
+                    eval.strengths() != null ? eval.strengths().size() : 0, eval.improvements() != null ? eval.improvements().size() : 0);
 
         } catch (Exception e) {
             System.out.printf("[%s] BENCHMARK FAILED with %s: %s%n", name, e.getClass().getSimpleName(), e.getMessage());

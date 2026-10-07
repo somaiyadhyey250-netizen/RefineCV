@@ -266,8 +266,21 @@ public class GroqAIProvider implements AIProvider {
         }
 
         if (status == 429 || status == 413 || "rate_limit_exceeded".equalsIgnoreCase(errorCode)) {
-            logger.warn("provider=groq operation={} status={} code={} category=RATE_QUOTA_EXHAUSTED durationMs={}",
-                    operation, status, errorCode != null ? errorCode : "none", duration);
+            long retryAfterMs = parseQuickRetryDelayMs(response);
+            if (allowRetry && retryAfterMs > 0 && retryAfterMs <= 2000) {
+                logger.warn("provider=groq operation={} status={} code={} action=quick_retry retryAfterMs={} durationMs={}",
+                        operation, status, errorCode != null ? errorCode : "none", retryAfterMs, duration);
+                try {
+                    Thread.sleep(retryAfterMs);
+                    return executeChatCompletionWithRetry(requestBody, operation, false);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new CancellationException("Groq retry was interrupted.");
+                }
+            }
+
+            logger.warn("provider=groq operation={} status={} code={} retryAfterMs={} category=RATE_QUOTA_EXHAUSTED durationMs={}",
+                    operation, status, errorCode != null ? errorCode : "none", retryAfterMs, duration);
             throw new AICommunicationException(getProviderName(), AIErrorCategory.RATE_QUOTA_EXHAUSTED,
                     "Groq rate limit or quota exceeded (HTTP " + status + ").", true, null);
         }
@@ -681,5 +694,30 @@ public class GroqAIProvider implements AIProvider {
                 "required", List.of("answerQuality", "strengths", "improvements"),
                 "additionalProperties", false
         );
+    }
+
+    static long parseQuickRetryDelayMs(HttpResponse<?> response) {
+        if (response == null || response.headers() == null) {
+            return -1;
+        }
+        var retryAfter = response.headers().firstValue("Retry-After");
+        if (retryAfter.isPresent() && !retryAfter.get().isBlank()) {
+            try {
+                double sec = Double.parseDouble(retryAfter.get().trim());
+                return (long) (sec * 1000.0);
+            } catch (NumberFormatException ignored) {}
+        }
+        var resetTokens = response.headers().firstValue("x-ratelimit-reset-tokens");
+        if (resetTokens.isPresent() && !resetTokens.get().isBlank()) {
+            String val = resetTokens.get().trim();
+            if (val.endsWith("s")) {
+                val = val.substring(0, val.length() - 1).trim();
+            }
+            try {
+                double sec = Double.parseDouble(val);
+                return (long) (sec * 1000.0);
+            } catch (NumberFormatException ignored) {}
+        }
+        return -1;
     }
 }

@@ -233,9 +233,15 @@ public class ResumeTextExtractor {
         int totalPages = document.getNumberOfPages();
         int pagesToProcess = Math.min(totalPages, maxOcrPages);
 
+        if (totalPages > maxOcrPages) {
+            logger.info("Scanned PDF contains {} pages; OCR processing bounded to first {} pages",
+                    totalPages, maxOcrPages);
+            if (progress != null) {
+                progress.accept("ocr-bounded-" + maxOcrPages + "-of-" + totalPages);
+            }
+        }
 
         try {
-
 
             /*
              * Process pages up to the configured OCR page limit.
@@ -266,7 +272,6 @@ public class ResumeTextExtractor {
                                 OCR_DPI
                         );
 
-
                 /*
                  * Run Tesseract OCR.
                  */
@@ -286,11 +291,9 @@ public class ResumeTextExtractor {
                     throw new ResumeValidationException(ResumeValidationException.Reason.TEXT_TOO_LARGE);
                 }
 
-
                 extractedText.append(
                         pageText
                 );
-
 
                 extractedText.append(
                         "\n"
@@ -298,6 +301,13 @@ public class ResumeTextExtractor {
 
             }
 
+            if (totalPages > maxOcrPages) {
+                extractedText.append("\n[Note: Document contains ")
+                        .append(totalPages)
+                        .append(" pages. Optical character recognition was safely bounded to the first ")
+                        .append(maxOcrPages)
+                        .append(" pages.]\n");
+            }
 
             return extractedText.toString();
 

@@ -262,35 +262,82 @@
     if (progressEl) progressEl.setAttribute('aria-valuenow', String(Math.round(pct)));
   }
 
+  function updateLoadingStatus(text) {
+    if (loadingFiles) {
+      var baseText = (state.fileA && state.fileB) ? (state.fileA.name + ' vs ' + state.fileB.name) : 'Comparing Resumes';
+      loadingFiles.innerHTML = '<strong>' + baseText + '</strong><br><span style="font-size:0.9rem; opacity:0.85;">' + text + '</span>';
+    }
+  }
+
   function handleStageUpdate(stage) {
     switch (stage) {
       case 'upload':
+      case 'comparison-upload':
         setStep(0, 'done');
         setStep(1, 'active');
-        setProgress(25);
+        setProgress(20);
+        updateLoadingStatus('Preparing documents for comparison...');
         break;
+      case 'comparison-extract-a':
       case 'reading':
       case 'extracting':
+      case 'extracting_a':
+        setStep(0, 'done');
+        setStep(1, 'active');
+        setProgress(35);
+        updateLoadingStatus('Reading content and structure from Resume A...');
+        break;
+      case 'comparison-extract-b':
+      case 'extracting_b':
+        setStep(0, 'done');
+        setStep(1, 'active');
+        setProgress(50);
+        updateLoadingStatus('Reading content and structure from Resume B...');
+        break;
+      case 'comparison-ocr':
+      case 'ocr':
         setStep(0, 'done');
         setStep(1, 'done');
         setStep(2, 'active');
-        setProgress(50);
+        setProgress(65);
+        updateLoadingStatus('Running OCR on scanned document pages...');
         break;
+      case 'comparison-ai':
+      case 'comparing':
       case 'evaluating':
       case 'ai-comparison':
+        setStep(0, 'done');
+        setStep(1, 'done');
         setStep(2, 'done');
         setStep(3, 'active');
         setProgress(75);
+        updateLoadingStatus('Evaluating 6 core categories with AI...');
         break;
+      case 'comparison-fallback':
+      case 'ai-fallback':
+        setStep(0, 'done');
+        setStep(1, 'done');
+        setStep(2, 'done');
+        setStep(3, 'active');
+        setProgress(80);
+        updateLoadingStatus('Primary AI provider is taking longer than expected. Switching to backup...');
+        break;
+      case 'comparison-scorecard':
       case 'scorecard':
       case 'writing':
+        setStep(0, 'done');
+        setStep(1, 'done');
+        setStep(2, 'done');
         setStep(3, 'done');
         setStep(4, 'active');
-        setProgress(90);
+        setProgress(92);
+        updateLoadingStatus('Writing comparative scorecard & takeaways...');
         break;
+      case 'comparison-complete':
       case 'completed':
         stepEls.forEach(function (_, i) { setStep(i, 'done'); });
         setProgress(100);
+        updateLoadingStatus('Comparison complete! Redirecting...');
         break;
     }
   }

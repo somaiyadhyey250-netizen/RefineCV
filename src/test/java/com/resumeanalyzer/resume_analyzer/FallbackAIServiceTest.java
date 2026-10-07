@@ -226,4 +226,38 @@ class FallbackAIServiceTest {
         assertThrows(AICommunicationException.class, () ->
                 fallbackAIService.improveResumeWithProvider("resume text", sampleAnalysis));
     }
+
+    @Test
+    @DisplayName("When primary times out with GeminiCommunicationException, immediately triggers Groq and emits ai-fallback")
+    void primaryTimeoutTriggersGroqFallbackAndEmitsProgress() {
+        java.util.List<String> emittedEvents = new java.util.ArrayList<>();
+        when(primaryProvider.analyzeResume(eq("resume text"), any()))
+                .thenThrow(new GeminiCommunicationException("Gemini analysis request timed out after 15 seconds.", null, false));
+        when(primaryProvider.getProviderName()).thenReturn("gemini");
+        when(fallbackProvider.isAvailable()).thenReturn(true);
+        when(fallbackProvider.getProviderName()).thenReturn("groq");
+        when(fallbackProvider.analyzeResume(eq("resume text"), any())).thenReturn(sampleAnalysis);
+
+        AIAnalysisResult result = fallbackAIService.analyzeResumeWithProvider("resume text", emittedEvents::add);
+
+        assertNotNull(result);
+        assertEquals("groq", result.providerName());
+        assertEquals(85, result.analysis().score());
+        org.junit.jupiter.api.Assertions.assertTrue(emittedEvents.contains("ai-fallback"));
+        verify(fallbackProvider).analyzeResume(eq("resume text"), any());
+    }
+
+    @Test
+    @DisplayName("FallbackAIService initializes with groq primary when preferredPrimary is groq")
+    void groqPrimaryInitialization() {
+        GeminiService geminiMock = org.mockito.Mockito.mock(GeminiService.class);
+        GroqAIProvider groqMock = org.mockito.Mockito.mock(GroqAIProvider.class);
+        when(groqMock.getProviderName()).thenReturn("groq");
+
+        FallbackAIService service = new FallbackAIService(geminiMock, groqMock, "groq");
+
+        assertEquals("groq", service.getProviderName());
+        assertEquals(groqMock, service.getPrimaryProvider());
+        assertEquals(geminiMock, service.getFallbackProvider());
+    }
 }

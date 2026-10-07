@@ -297,6 +297,15 @@
         setStep(3, 'active');
         setProgress(75);
         break;
+      case 'ai-fallback':
+        setStep(2, 'done');
+        setStep(3, 'active');
+        setProgress(80);
+        var aiFallbackSmall = stepEls[3] ? stepEls[3].querySelector('small') : null;
+        if (aiFallbackSmall) {
+          aiFallbackSmall.textContent = 'Primary AI taking longer than expected. Switching to backup...';
+        }
+        break;
       case 'recommendations':
         setStep(3, 'done');
         setStep(4, 'active');

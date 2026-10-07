@@ -8,12 +8,13 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 /**
- * Centralized AI provider coordinator managing primary (Gemini) execution
- * and graceful fallback (Groq) on rate limit, quota exhaustion, or service unavailability.
+ * Centralized AI provider coordinator managing primary execution
+ * and graceful fallback on rate limit, quota exhaustion, timeout, or service unavailability.
  */
 @Service
 @Primary
@@ -26,10 +27,27 @@ public class FallbackAIService implements AIProvider {
 
     @Autowired
     public FallbackAIService(
-            GeminiService primaryProvider,
-            GroqAIProvider fallbackProvider
+            GeminiService geminiService,
+            GroqAIProvider groqAIProvider,
+            @Value("${refinecv.ai.primary-provider:gemini}") String preferredPrimary
     ) {
-        this((AIProvider) primaryProvider, (AIProvider) fallbackProvider);
+        if ("groq".equalsIgnoreCase(preferredPrimary)) {
+            this.primaryProvider = Objects.requireNonNull(groqAIProvider, "groqAIProvider must not be null");
+            this.fallbackProvider = Objects.requireNonNull(geminiService, "geminiService must not be null");
+        } else {
+            this.primaryProvider = Objects.requireNonNull(geminiService, "geminiService must not be null");
+            this.fallbackProvider = Objects.requireNonNull(groqAIProvider, "groqAIProvider must not be null");
+        }
+        logger.info("FallbackAIService initialized with primary={} fallback={}",
+                resolveProviderName(primaryProvider, "primary"),
+                resolveProviderName(fallbackProvider, "fallback"));
+    }
+
+    public FallbackAIService(
+            GeminiService geminiService,
+            GroqAIProvider groqAIProvider
+    ) {
+        this(geminiService, groqAIProvider, "groq");
     }
 
     public FallbackAIService(
@@ -43,7 +61,7 @@ public class FallbackAIService implements AIProvider {
     @Override
     public String getProviderName() {
         String name = primaryProvider.getProviderName();
-        return (name != null && !name.isBlank()) ? name : "gemini";
+        return (name != null && !name.isBlank()) ? name : "ai";
     }
 
     @Override
@@ -73,26 +91,25 @@ public class FallbackAIService implements AIProvider {
     public AIAnalysisResult analyzeResumeWithProvider(String resumeText, Consumer<String> progress) {
         try {
             ResumeAnalysisDTO result = primaryProvider.analyzeResume(resumeText, progress);
-            String providerName = primaryProvider.getProviderName();
-            if (providerName == null || providerName.isBlank()) {
-                providerName = "gemini";
-            }
-            return new AIAnalysisResult(result, providerName);
+            return new AIAnalysisResult(result, resolveProviderName(primaryProvider, "primary"));
         } catch (Exception e) {
             if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
+                if (progress != null) {
+                    progress.accept("ai-fallback");
+                }
                 String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
                         ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
                 logger.warn("provider={} operation=analysis fallback={} category={}",
-                        resolveProviderName(primaryProvider, "gemini"),
-                        resolveProviderName(fallbackProvider, "groq"),
+                        resolveProviderName(primaryProvider, "primary"),
+                        resolveProviderName(fallbackProvider, "fallback"),
                         categoryName);
                 try {
                     ResumeAnalysisDTO fallbackResult = fallbackProvider.analyzeResume(resumeText, progress);
-                    logger.info("provider={} operation=analysis success=true", resolveProviderName(fallbackProvider, "groq"));
-                    return new AIAnalysisResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                    logger.info("provider={} operation=analysis success=true", resolveProviderName(fallbackProvider, "fallback"));
+                    return new AIAnalysisResult(fallbackResult, resolveProviderName(fallbackProvider, "fallback"));
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=analysis failed errorType={}",
-                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                            resolveProviderName(fallbackProvider, "fallback"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }
             }
@@ -107,22 +124,25 @@ public class FallbackAIService implements AIProvider {
         }
         try {
             ResumeAnalysisDTO result = primaryProvider.analyzeResumeForJob(resumeText, jobDescription, progress);
-            return new AIAnalysisResult(result, resolveProviderName(primaryProvider, "gemini"));
+            return new AIAnalysisResult(result, resolveProviderName(primaryProvider, "primary"));
         } catch (Exception e) {
             if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
+                if (progress != null) {
+                    progress.accept("ai-fallback");
+                }
                 String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
                         ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
                 logger.warn("provider={} operation=job_analysis fallback={} category={}",
-                        resolveProviderName(primaryProvider, "gemini"),
-                        resolveProviderName(fallbackProvider, "groq"),
+                        resolveProviderName(primaryProvider, "primary"),
+                        resolveProviderName(fallbackProvider, "fallback"),
                         categoryName);
                 try {
                     ResumeAnalysisDTO fallbackResult = fallbackProvider.analyzeResumeForJob(resumeText, jobDescription, progress);
-                    logger.info("provider={} operation=job_analysis success=true", resolveProviderName(fallbackProvider, "groq"));
-                    return new AIAnalysisResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                    logger.info("provider={} operation=job_analysis success=true", resolveProviderName(fallbackProvider, "fallback"));
+                    return new AIAnalysisResult(fallbackResult, resolveProviderName(fallbackProvider, "fallback"));
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=job_analysis failed errorType={}",
-                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                            resolveProviderName(fallbackProvider, "fallback"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }
             }
@@ -144,26 +164,22 @@ public class FallbackAIService implements AIProvider {
     public AIImprovementResult improveResumeWithProvider(String resumeText, ResumeAnalysisDTO analysis) {
         try {
             ResumeImprovementDTO result = primaryProvider.improveResume(resumeText, analysis);
-            String providerName = primaryProvider.getProviderName();
-            if (providerName == null || providerName.isBlank()) {
-                providerName = "gemini";
-            }
-            return new AIImprovementResult(result, providerName);
+            return new AIImprovementResult(result, resolveProviderName(primaryProvider, "primary"));
         } catch (Exception e) {
             if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
                 String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
                         ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
                 logger.warn("provider={} operation=improvement fallback={} category={}",
-                        resolveProviderName(primaryProvider, "gemini"),
-                        resolveProviderName(fallbackProvider, "groq"),
+                        resolveProviderName(primaryProvider, "primary"),
+                        resolveProviderName(fallbackProvider, "fallback"),
                         categoryName);
                 try {
                     ResumeImprovementDTO fallbackResult = fallbackProvider.improveResume(resumeText, analysis);
-                    logger.info("provider={} operation=improvement success=true", resolveProviderName(fallbackProvider, "groq"));
-                    return new AIImprovementResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                    logger.info("provider={} operation=improvement success=true", resolveProviderName(fallbackProvider, "fallback"));
+                    return new AIImprovementResult(fallbackResult, resolveProviderName(fallbackProvider, "fallback"));
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=improvement failed errorType={}",
-                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                            resolveProviderName(fallbackProvider, "fallback"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }
             }
@@ -178,22 +194,22 @@ public class FallbackAIService implements AIProvider {
         }
         try {
             ResumeImprovementDTO result = primaryProvider.improveResumeForJob(resumeText, analysis, jobDescription);
-            return new AIImprovementResult(result, resolveProviderName(primaryProvider, "gemini"));
+            return new AIImprovementResult(result, resolveProviderName(primaryProvider, "primary"));
         } catch (Exception e) {
             if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
                 String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
                         ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
                 logger.warn("provider={} operation=job_improvement fallback={} category={}",
-                        resolveProviderName(primaryProvider, "gemini"),
-                        resolveProviderName(fallbackProvider, "groq"),
+                        resolveProviderName(primaryProvider, "primary"),
+                        resolveProviderName(fallbackProvider, "fallback"),
                         categoryName);
                 try {
                     ResumeImprovementDTO fallbackResult = fallbackProvider.improveResumeForJob(resumeText, analysis, jobDescription);
-                    logger.info("provider={} operation=job_improvement success=true", resolveProviderName(fallbackProvider, "groq"));
-                    return new AIImprovementResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                    logger.info("provider={} operation=job_improvement success=true", resolveProviderName(fallbackProvider, "fallback"));
+                    return new AIImprovementResult(fallbackResult, resolveProviderName(fallbackProvider, "fallback"));
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=job_improvement failed errorType={}",
-                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                            resolveProviderName(fallbackProvider, "fallback"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }
             }
@@ -226,22 +242,25 @@ public class FallbackAIService implements AIProvider {
     ) {
         try {
             ResumeComparisonDTO result = primaryProvider.compareResumes(resumeTextA, resumeTextB, jobDescription, comparisonId, fileNameA, fileNameB, progress);
-            return new AIComparisonResult(result, resolveProviderName(primaryProvider, "gemini"));
+            return new AIComparisonResult(result, resolveProviderName(primaryProvider, "primary"));
         } catch (Exception e) {
             if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
+                if (progress != null) {
+                    progress.accept("ai-fallback");
+                }
                 String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
                         ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
                 logger.warn("provider={} operation=comparison fallback={} category={}",
-                        resolveProviderName(primaryProvider, "gemini"),
-                        resolveProviderName(fallbackProvider, "groq"),
+                        resolveProviderName(primaryProvider, "primary"),
+                        resolveProviderName(fallbackProvider, "fallback"),
                         categoryName);
                 try {
                     ResumeComparisonDTO fallbackResult = fallbackProvider.compareResumes(resumeTextA, resumeTextB, jobDescription, comparisonId, fileNameA, fileNameB, progress);
-                    logger.info("provider={} operation=comparison success=true", resolveProviderName(fallbackProvider, "groq"));
-                    return new AIComparisonResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                    logger.info("provider={} operation=comparison success=true", resolveProviderName(fallbackProvider, "fallback"));
+                    return new AIComparisonResult(fallbackResult, resolveProviderName(fallbackProvider, "fallback"));
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=comparison failed errorType={}",
-                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                            resolveProviderName(fallbackProvider, "fallback"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }
             }
@@ -268,22 +287,25 @@ public class FallbackAIService implements AIProvider {
     ) {
         try {
             InterviewPrepDTO result = primaryProvider.generateInterviewPrep(resumeText, prepId, filename, progress);
-            return new AIInterviewPrepResult(result, resolveProviderName(primaryProvider, "gemini"));
+            return new AIInterviewPrepResult(result, resolveProviderName(primaryProvider, "primary"));
         } catch (Exception e) {
             if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
+                if (progress != null) {
+                    progress.accept("ai-fallback");
+                }
                 String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
                         ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
                 logger.warn("provider={} operation=interview_prep fallback={} category={}",
-                        resolveProviderName(primaryProvider, "gemini"),
-                        resolveProviderName(fallbackProvider, "groq"),
+                        resolveProviderName(primaryProvider, "primary"),
+                        resolveProviderName(fallbackProvider, "fallback"),
                         categoryName);
                 try {
                     InterviewPrepDTO fallbackResult = fallbackProvider.generateInterviewPrep(resumeText, prepId, filename, progress);
-                    logger.info("provider={} operation=interview_prep success=true", resolveProviderName(fallbackProvider, "groq"));
-                    return new AIInterviewPrepResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                    logger.info("provider={} operation=interview_prep success=true", resolveProviderName(fallbackProvider, "fallback"));
+                    return new AIInterviewPrepResult(fallbackResult, resolveProviderName(fallbackProvider, "fallback"));
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=interview_prep failed errorType={}",
-                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                            resolveProviderName(fallbackProvider, "fallback"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }
             }
@@ -303,16 +325,16 @@ public class FallbackAIService implements AIProvider {
                 String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
                         ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
                 logger.warn("provider={} operation=generate_more_questions fallback={} category={}",
-                        resolveProviderName(primaryProvider, "gemini"),
-                        resolveProviderName(fallbackProvider, "groq"),
+                        resolveProviderName(primaryProvider, "primary"),
+                        resolveProviderName(fallbackProvider, "fallback"),
                         categoryName);
                 try {
                     List<InterviewQuestionDTO> fallbackResult = fallbackProvider.generateMoreQuestions(resumeText, existingQuestions);
-                    logger.info("provider={} operation=generate_more_questions success=true", resolveProviderName(fallbackProvider, "groq"));
+                    logger.info("provider={} operation=generate_more_questions success=true", resolveProviderName(fallbackProvider, "fallback"));
                     return fallbackResult;
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=generate_more_questions failed errorType={}",
-                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                            resolveProviderName(fallbackProvider, "fallback"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }
             }
@@ -337,22 +359,22 @@ public class FallbackAIService implements AIProvider {
     ) {
         try {
             InterviewAnswerEvaluationDTO result = primaryProvider.evaluateAnswer(question, basedOn, userAnswer);
-            return new AIAnswerEvaluationResult(result, resolveProviderName(primaryProvider, "gemini"));
+            return new AIAnswerEvaluationResult(result, resolveProviderName(primaryProvider, "primary"));
         } catch (Exception e) {
             if (isFallbackEligible(e) && fallbackProvider.isAvailable()) {
                 String categoryName = (e instanceof AICommunicationException aiEx && aiEx.isRateLimited())
                         ? "RATE_QUOTA_EXHAUSTED" : "COMMUNICATION_FAILURE";
                 logger.warn("provider={} operation=evaluate_answer fallback={} category={}",
-                        resolveProviderName(primaryProvider, "gemini"),
-                        resolveProviderName(fallbackProvider, "groq"),
+                        resolveProviderName(primaryProvider, "primary"),
+                        resolveProviderName(fallbackProvider, "fallback"),
                         categoryName);
                 try {
                     InterviewAnswerEvaluationDTO fallbackResult = fallbackProvider.evaluateAnswer(question, basedOn, userAnswer);
-                    logger.info("provider={} operation=evaluate_answer success=true", resolveProviderName(fallbackProvider, "groq"));
-                    return new AIAnswerEvaluationResult(fallbackResult, resolveProviderName(fallbackProvider, "groq"));
+                    logger.info("provider={} operation=evaluate_answer success=true", resolveProviderName(fallbackProvider, "fallback"));
+                    return new AIAnswerEvaluationResult(fallbackResult, resolveProviderName(fallbackProvider, "fallback"));
                 } catch (Exception fallbackEx) {
                     logger.error("provider={} operation=evaluate_answer failed errorType={}",
-                            resolveProviderName(fallbackProvider, "groq"), fallbackEx.getClass().getName());
+                            resolveProviderName(fallbackProvider, "fallback"), fallbackEx.getClass().getName());
                     throw fallbackEx;
                 }
             }

@@ -933,26 +933,43 @@ public class ResumeController {
         try {
             state.checkActive();
             sendEvent(emitter, state, "comparison-id", comparisonId);
+            sendStatus(emitter, state, "comparison-upload");
             sendStatus(emitter, state, "upload");
 
             byte[] bytesA = fileA.getBytes();
             byte[] bytesB = fileB.getBytes();
             state.checkActive();
 
+            sendStatus(emitter, state, "comparison-extract-a");
             sendStatus(emitter, state, "extracting_a");
             String textA = null;
             try {
-                textA = resumeTextExtractor.extractText(bytesA, status -> sendStatus(emitter, state, "extracting_a"));
+                textA = resumeTextExtractor.extractText(bytesA, status -> {
+                    if (status != null && status.startsWith("ocr")) {
+                        sendStatus(emitter, state, "comparison-ocr");
+                        sendStatus(emitter, state, status);
+                    } else {
+                        sendStatus(emitter, state, "comparison-extract-a");
+                    }
+                });
             } catch (Exception e) {
                 logger.warn("comparison_extraction_failed_a comparisonId={}", comparisonId);
             }
 
             state.checkActive();
 
+            sendStatus(emitter, state, "comparison-extract-b");
             sendStatus(emitter, state, "extracting_b");
             String textB = null;
             try {
-                textB = resumeTextExtractor.extractText(bytesB, status -> sendStatus(emitter, state, "extracting_b"));
+                textB = resumeTextExtractor.extractText(bytesB, status -> {
+                    if (status != null && status.startsWith("ocr")) {
+                        sendStatus(emitter, state, "comparison-ocr");
+                        sendStatus(emitter, state, status);
+                    } else {
+                        sendStatus(emitter, state, "comparison-extract-b");
+                    }
+                });
             } catch (Exception e) {
                 logger.warn("comparison_extraction_failed_b comparisonId={}", comparisonId);
             }
@@ -973,6 +990,8 @@ public class ResumeController {
                 ResumeComparisonDTO unreadableDto = ResumeComparisonDTO.forUnreadable(
                         comparisonId, nameA, nameB, reason, jobDescription);
                 sessionStore.saveComparison(unreadableDto);
+                sendStatus(emitter, state, "comparison-complete");
+                sendStatus(emitter, state, "completed");
                 sendEvent(emitter, state, "result", unreadableDto);
                 emitter.complete();
                 logger.info("comparison_unreadable comparisonId={}", comparisonId);
@@ -985,18 +1004,31 @@ public class ResumeController {
                 ResumeComparisonDTO identicalDto = ResumeComparisonDTO.forIdentical(
                         comparisonId, nameA, nameB, jobDescription);
                 sessionStore.saveComparison(identicalDto);
+                sendStatus(emitter, state, "comparison-complete");
+                sendStatus(emitter, state, "completed");
                 sendEvent(emitter, state, "result", identicalDto);
                 emitter.complete();
                 logger.info("comparison_identical comparisonId={}", comparisonId);
                 return;
             }
 
+            sendStatus(emitter, state, "comparison-ai");
             sendStatus(emitter, state, "comparing");
             AIComparisonResult aiResult = aiProvider.compareResumesWithProvider(
                     textA, textB, jobDescription, comparisonId, nameA, nameB,
-                    status -> sendStatus(emitter, state, status)
+                    status -> {
+                        if ("ai-fallback".equals(status)) {
+                            sendStatus(emitter, state, "comparison-fallback");
+                            sendStatus(emitter, state, "ai-fallback");
+                        } else {
+                            sendStatus(emitter, state, "comparison-ai");
+                            sendStatus(emitter, state, status);
+                        }
+                    }
             );
 
+            sendStatus(emitter, state, "comparison-scorecard");
+            sendStatus(emitter, state, "writing");
             ResumeComparisonDTO rawComparison = aiResult.comparison();
 
             ResumeComparisonDTO finalComparison = new ResumeComparisonDTO(
@@ -1030,6 +1062,8 @@ public class ResumeController {
             if (aiResult.providerName() != null && !aiResult.providerName().isBlank()) {
                 sendEvent(emitter, state, "provider", aiResult.providerName());
             }
+            sendStatus(emitter, state, "comparison-complete");
+            sendStatus(emitter, state, "completed");
             sendEvent(emitter, state, "result", finalComparison);
             emitter.complete();
             logger.info("comparison_succeeded comparisonId={} provider={} durationMs={}",

@@ -1,10 +1,20 @@
 package com.resumeanalyzer.resume_analyzer;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -12,32 +22,54 @@ import org.springframework.stereotype.Service;
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
+import com.google.genai.types.HttpOptions;
+import com.google.genai.types.HttpRetryOptions;
 import com.google.genai.types.Schema;
 
 @Service
 public class GeminiService implements AIProvider {
 
+    private static final Logger logger = LoggerFactory.getLogger(GeminiService.class);
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final int maxResponseCharacters;
     private final String apiKey;
     private final String model;
+    private final Duration timeout;
+    private final ExecutorService geminiExecutor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "gemini-deadline-worker");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private volatile Client cachedClient;
 
     @Autowired
     public GeminiService(
             @Value("${refinecv.gemini.max-response-characters:20000}") int maxResponseCharacters,
             @Value("${refinecv.gemini.api-key:}") String apiKey,
-            @Value("${refinecv.gemini.model:gemini-3.6-flash}") String model
+            @Value("${refinecv.gemini.model:gemini-3.6-flash}") String model,
+            @Value("${refinecv.gemini.timeout:15s}") Duration timeout
     ) {
         this.maxResponseCharacters = maxResponseCharacters;
-        this.apiKey = apiKey;
-        this.model = (model == null || model.isBlank()) ? "gemini-3.6-flash" : model;
+        this.apiKey = apiKey != null ? apiKey.trim() : "";
+        this.model = (model == null || model.isBlank()) ? "gemini-3.6-flash" : model.trim();
+        this.timeout = timeout != null ? timeout : Duration.ofSeconds(15);
+    }
+
+    public GeminiService(
+            int maxResponseCharacters,
+            String apiKey,
+            String model
+    ) {
+        this(maxResponseCharacters, apiKey, model, Duration.ofSeconds(15));
     }
 
     public GeminiService(
             int maxResponseCharacters,
             String apiKey
     ) {
-        this(maxResponseCharacters, apiKey, "gemini-3.6-flash");
+        this(maxResponseCharacters, apiKey, "gemini-3.6-flash", Duration.ofSeconds(15));
     }
 
     @Override
@@ -47,27 +79,93 @@ public class GeminiService implements AIProvider {
 
     @Override
     public boolean isAvailable() {
-        return apiKey != null && !apiKey.trim().isEmpty();
+        return apiKey != null && !apiKey.isEmpty();
     }
 
-    /*
-     * Existing method.
-     * Keeps compatibility with any code that calls analyzeResume(resumeText).
-     */
+    public Duration getTimeout() {
+        return timeout;
+    }
+
+    private synchronized Client getOrCreateClient() {
+        if (cachedClient != null) {
+            return cachedClient;
+        }
+        try {
+            HttpOptions httpOptions = HttpOptions.builder()
+                    .timeout((int) timeout.toMillis())
+                    .retryOptions(HttpRetryOptions.builder()
+                            .attempts(1)
+                            .build())
+                    .build();
+            cachedClient = Client.builder()
+                    .apiKey(apiKey)
+                    .httpOptions(httpOptions)
+                    .build();
+            return cachedClient;
+        } catch (RuntimeException e) {
+            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
+        }
+    }
+
+    GenerateContentResponse callGeminiWithDeadline(
+            String prompt,
+            GenerateContentConfig config,
+            String operation
+    ) {
+        if (!isAvailable()) {
+            throw new GeminiCommunicationException("Gemini is not configured.", null);
+        }
+
+        Client client = getOrCreateClient();
+        long startTime = System.currentTimeMillis();
+
+        Future<GenerateContentResponse> future = geminiExecutor.submit(() ->
+                client.models.generateContent(model, prompt, config)
+        );
+
+        try {
+            GenerateContentResponse response = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            long elapsed = System.currentTimeMillis() - startTime;
+            logger.info("provider=gemini operation={} status=200 durationMs={}", operation, elapsed);
+            return response;
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            long elapsed = System.currentTimeMillis() - startTime;
+            logger.warn("provider=gemini operation={} status=timeout durationMs={} timeoutLimitMs={}",
+                    operation, elapsed, timeout.toMillis());
+            throw new GeminiCommunicationException(
+                    "Gemini " + operation + " request timed out after " + timeout.toSeconds() + " seconds.",
+                    e,
+                    false
+            );
+        } catch (ExecutionException e) {
+            future.cancel(true);
+            long elapsed = System.currentTimeMillis() - startTime;
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            boolean isRateLimit = isRateLimitError(cause);
+            logger.warn("provider=gemini operation={} status=failed rateLimit={} durationMs={} error={}",
+                    operation, isRateLimit, elapsed, cause.getMessage());
+            throw new GeminiCommunicationException(
+                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini " + operation + " request failed.",
+                    cause,
+                    isRateLimit
+            );
+        } catch (InterruptedException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new CancellationException("Gemini " + operation + " was interrupted.");
+        }
+    }
+
     public ResumeAnalysisDTO analyzeResume(
             String resumeText
     ) {
         return analyzeResume(
                 resumeText,
-                status -> {
-                    // No progress listener required.
-                }
+                status -> {}
         );
     }
 
-    /*
-     * Method with progress reporting.
-     */
     @Override
     public ResumeAnalysisDTO analyzeResume(
             String resumeText,
@@ -91,17 +189,6 @@ public class GeminiService implements AIProvider {
             String jobDescription,
             Consumer<String> progress
     ) {
-        if (!isAvailable()) {
-            throw new GeminiCommunicationException("Gemini is not configured.", null);
-        }
-
-        Client client;
-        try {
-            client = Client.builder().apiKey(apiKey).build();
-        } catch (RuntimeException e) {
-            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
-        }
-
         Schema resumeSchema = buildResumeSchema(mode);
         String prompt = (mode == AnalysisMode.SPECIFIC_JOB && jobDescription != null && !jobDescription.isBlank())
                 ? AIPromptBuilder.buildJobAnalysisPrompt(resumeText, jobDescription)
@@ -112,25 +199,15 @@ public class GeminiService implements AIProvider {
                 .responseSchema(resumeSchema)
                 .build();
 
-        progress.accept("ai-analysis");
-
-        GenerateContentResponse response;
-        try {
-            response = client.models.generateContent(
-                    model,
-                    prompt,
-                    config
-            );
-        } catch (RuntimeException e) {
-            boolean isRateLimit = isRateLimitError(e);
-            throw new GeminiCommunicationException(
-                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini analysis request failed.",
-                    e,
-                    isRateLimit
-            );
+        if (progress != null) {
+            progress.accept("ai-analysis");
         }
 
-        progress.accept("recommendations");
+        GenerateContentResponse response = callGeminiWithDeadline(prompt, config, "analysis");
+
+        if (progress != null) {
+            progress.accept("recommendations");
+        }
 
         String result = response == null ? null : response.text();
         return parseAndValidateResponse(result);
@@ -208,17 +285,6 @@ public class GeminiService implements AIProvider {
             ResumeAnalysisDTO analysis,
             String jobDescription
     ) {
-        if (!isAvailable()) {
-            throw new GeminiCommunicationException("Gemini is not configured.", null);
-        }
-
-        Client client;
-        try {
-            client = Client.builder().apiKey(apiKey).build();
-        } catch (RuntimeException e) {
-            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
-        }
-
         Schema bulletItemSchema = Schema.builder()
                 .type("OBJECT")
                 .properties(Map.of(
@@ -264,21 +330,7 @@ public class GeminiService implements AIProvider {
                 .responseSchema(improvementSchema)
                 .build();
 
-        GenerateContentResponse response;
-        try {
-            response = client.models.generateContent(
-                    model,
-                    prompt,
-                    config
-            );
-        } catch (RuntimeException e) {
-            boolean isRateLimit = isRateLimitError(e);
-            throw new GeminiCommunicationException(
-                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini improvement request failed.",
-                    e,
-                    isRateLimit
-            );
-        }
+        GenerateContentResponse response = callGeminiWithDeadline(prompt, config, "improvement");
 
         String result = response == null ? null : response.text();
         return parseAndValidateImprovementResponse(result);
@@ -302,17 +354,6 @@ public class GeminiService implements AIProvider {
             String fileNameB,
             Consumer<String> progress
     ) {
-        if (!isAvailable()) {
-            throw new GeminiCommunicationException("Gemini is not configured.", null);
-        }
-
-        Client client;
-        try {
-            client = Client.builder().apiKey(apiKey).build();
-        } catch (RuntimeException e) {
-            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
-        }
-
         Schema categorySchema = Schema.builder()
                 .type("OBJECT")
                 .properties(Map.of(
@@ -371,21 +412,7 @@ public class GeminiService implements AIProvider {
             progress.accept("comparing");
         }
 
-        GenerateContentResponse response;
-        try {
-            response = client.models.generateContent(
-                    model,
-                    prompt,
-                    config
-            );
-        } catch (RuntimeException e) {
-            boolean isRateLimit = isRateLimitError(e);
-            throw new GeminiCommunicationException(
-                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini comparison request failed.",
-                    e,
-                    isRateLimit
-            );
-        }
+        GenerateContentResponse response = callGeminiWithDeadline(prompt, config, "comparison");
 
         String result = response == null ? null : response.text();
         return AIResponseParser.parseAndValidateComparison(
@@ -407,17 +434,6 @@ public class GeminiService implements AIProvider {
             String filename,
             Consumer<String> progress
     ) {
-        if (!isAvailable()) {
-            throw new GeminiCommunicationException("Gemini is not configured.", null);
-        }
-
-        Client client;
-        try {
-            client = Client.builder().apiKey(apiKey).build();
-        } catch (RuntimeException e) {
-            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
-        }
-
         Schema questionSchema = Schema.builder()
                 .type("OBJECT")
                 .properties(Map.of(
@@ -462,21 +478,7 @@ public class GeminiService implements AIProvider {
             progress.accept("generating");
         }
 
-        GenerateContentResponse response;
-        try {
-            response = client.models.generateContent(
-                    model,
-                    prompt,
-                    config
-            );
-        } catch (RuntimeException e) {
-            boolean isRateLimit = isRateLimitError(e);
-            throw new GeminiCommunicationException(
-                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini interview prep request failed.",
-                    e,
-                    isRateLimit
-            );
-        }
+        GenerateContentResponse response = callGeminiWithDeadline(prompt, config, "interview_prep");
 
         String result = response == null ? null : response.text();
         return AIResponseParser.parseAndValidateInterviewPrep(
@@ -494,17 +496,6 @@ public class GeminiService implements AIProvider {
             String resumeText,
             List<String> existingQuestions
     ) {
-        if (!isAvailable()) {
-            throw new GeminiCommunicationException("Gemini is not configured.", null);
-        }
-
-        Client client;
-        try {
-            client = Client.builder().apiKey(apiKey).build();
-        } catch (RuntimeException e) {
-            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
-        }
-
         Schema questionSchema = Schema.builder()
                 .type("OBJECT")
                 .properties(Map.of(
@@ -533,21 +524,7 @@ public class GeminiService implements AIProvider {
                 .responseSchema(additionalSchema)
                 .build();
 
-        GenerateContentResponse response;
-        try {
-            response = client.models.generateContent(
-                    model,
-                    prompt,
-                    config
-            );
-        } catch (RuntimeException e) {
-            boolean isRateLimit = isRateLimitError(e);
-            throw new GeminiCommunicationException(
-                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini generate more questions request failed.",
-                    e,
-                    isRateLimit
-            );
-        }
+        GenerateContentResponse response = callGeminiWithDeadline(prompt, config, "generate_more_questions");
 
         String result = response == null ? null : response.text();
         return AIResponseParser.parseAndValidateAdditionalQuestions(
@@ -564,17 +541,6 @@ public class GeminiService implements AIProvider {
             String basedOn,
             String userAnswer
     ) {
-        if (!isAvailable()) {
-            throw new GeminiCommunicationException("Gemini is not configured.", null);
-        }
-
-        Client client;
-        try {
-            client = Client.builder().apiKey(apiKey).build();
-        } catch (RuntimeException e) {
-            throw new GeminiCommunicationException("Could not initialize Gemini client.", e);
-        }
-
         Schema evalSchema = Schema.builder()
                 .type("OBJECT")
                 .properties(Map.of(
@@ -592,21 +558,7 @@ public class GeminiService implements AIProvider {
                 .responseSchema(evalSchema)
                 .build();
 
-        GenerateContentResponse response;
-        try {
-            response = client.models.generateContent(
-                    model,
-                    prompt,
-                    config
-            );
-        } catch (RuntimeException e) {
-            boolean isRateLimit = isRateLimitError(e);
-            throw new GeminiCommunicationException(
-                    isRateLimit ? "Gemini quota or rate limit exceeded." : "Gemini answer evaluation request failed.",
-                    e,
-                    isRateLimit
-            );
-        }
+        GenerateContentResponse response = callGeminiWithDeadline(prompt, config, "answer_evaluation");
 
         String result = response == null ? null : response.text();
         return AIResponseParser.parseAndValidateAnswerEvaluation(

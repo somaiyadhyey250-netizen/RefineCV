@@ -47,6 +47,10 @@ COPY --from=builder /build/tessdata ./tessdata
 RUN chown -R refinecv:refinecv /app
 USER refinecv
 
+# Prevent OpenMP thread contention inside CPU-throttled containers
+ENV OMP_THREAD_LIMIT=1
+ENV TESSDATA_PREFIX=/app/tessdata
+
 # Default server port (Render injects dynamic PORT environment variable)
 ENV PORT=8080
 EXPOSE 8080

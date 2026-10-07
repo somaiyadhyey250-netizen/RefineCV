@@ -235,6 +235,30 @@
   }
 
   function handleStageUpdate(stage) {
+    var m = stage ? stage.match(/^ocr-page-(\d+)(?:-of-(\d+))?$/) : null;
+    if (m) {
+      var pageNum = parseInt(m[1], 10);
+      var totalPages = m[2] ? parseInt(m[2], 10) : null;
+      setStep(0, 'done');
+      setStep(1, 'done');
+      setStep(2, 'active');
+      var bEl = stepEls[2] ? stepEls[2].querySelector('b') : null;
+      if (bEl) {
+        bEl.textContent = 'Checking scanned pages';
+      }
+      var smallEl = stepEls[2] ? stepEls[2].querySelector('small') : null;
+      if (smallEl) {
+        smallEl.textContent = totalPages
+          ? 'OCR page ' + pageNum + ' of ' + totalPages + '...'
+          : 'OCR page ' + pageNum + '...';
+      }
+      var baseProgress = 48;
+      var pageProgress = totalPages
+        ? Math.min(68, baseProgress + Math.round((pageNum / totalPages) * 20))
+        : Math.min(68, baseProgress + (pageNum * 6));
+      setProgress(pageProgress);
+      return;
+    }
     switch (stage) {
       case 'upload':
         setStep(0, 'done');
@@ -249,8 +273,24 @@
         setProgress(45);
         break;
       case 'ocr':
+        setStep(0, 'done');
+        setStep(1, 'done');
         setStep(2, 'active');
-        setProgress(60);
+        setProgress(48);
+        var ocrStartSmall = stepEls[2] ? stepEls[2].querySelector('small') : null;
+        if (ocrStartSmall) {
+          ocrStartSmall.textContent = 'Initializing optical character recognition...';
+        }
+        break;
+      case 'ocr-complete':
+        setStep(0, 'done');
+        setStep(1, 'done');
+        setStep(2, 'active');
+        setProgress(70);
+        var ocrDoneSmall = stepEls[2] ? stepEls[2].querySelector('small') : null;
+        if (ocrDoneSmall) {
+          ocrDoneSmall.textContent = 'Text extracted successfully';
+        }
         break;
       case 'ai-analysis':
         setStep(2, 'done');
@@ -309,6 +349,8 @@
 
     if (loadingFile) loadingFile.textContent = state.file.name;
     stepEls.forEach(function (_, i) { setStep(i, null); });
+    var ocrInitSmall = stepEls[2] ? stepEls[2].querySelector('small') : null;
+    if (ocrInitSmall) ocrInitSmall.textContent = 'Applying OCR where text is an image';
     setStep(0, 'active');
     setProgress(10);
     showView('loading');
@@ -342,6 +384,9 @@
       if (headerId) state.analysisId = headerId.trim();
 
       await readSSE(response);
+      if (!state.sseReceivedTerminal) {
+        throw new Error('The analysis connection closed unexpectedly. Please try again.');
+      }
 
     } catch (err) {
       state.isAnalyzing = false;

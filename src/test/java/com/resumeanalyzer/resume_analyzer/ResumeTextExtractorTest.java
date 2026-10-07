@@ -70,6 +70,7 @@ class ResumeTextExtractorTest {
                 () -> extractor.extractText(pdfWithPages(1), progress::add)
         );
         assertEquals(ResumeValidationException.Reason.NO_READABLE_TEXT, exception.getReason());
+        assertTrue(progress.contains("ocr-page-1"));
         assertTrue(progress.contains("ocr-complete"));
     }
 
@@ -158,6 +159,167 @@ class ResumeTextExtractorTest {
         assertEquals(ResumeProcessingException.Stage.OCR, exception.getStage());
         assertEquals("We couldn't process this resume. Please try again.",
                 AnalysisErrorMessages.forException(exception));
+    }
+
+    @Test
+    void defaultOcrMaxPagesIsThree() {
+        assertEquals(3, extractor.getMaxOcrPages());
+    }
+
+    @Test
+    void rejectsNonPositiveOcrMaxPages() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new ResumeTextExtractor(20, 50_000, 3600, 3600, 8_000_000, "tessdata", 0)
+        );
+    }
+
+    @Test
+    void onePageScannedPdfPerformsOcrAndEmitsPageProgress() throws Exception {
+        java.util.List<String> progress = new java.util.ArrayList<>();
+        byte[] scannedPdf = scannedPdfWithTextPages("Experienced Java Engineer with Spring Boot and AWS.");
+        String text = extractor.extractText(scannedPdf, progress::add);
+
+        assertTrue(text.contains("Java") || text.contains("Engineer") || text.contains("Spring"));
+        assertTrue(progress.contains("ocr"));
+        assertTrue(progress.contains("ocr-page-1"));
+        assertTrue(progress.contains("ocr-page-1-of-1"));
+        assertTrue(!progress.contains("ocr-page-2"));
+        assertTrue(progress.contains("ocr-complete"));
+    }
+
+    @Test
+    void twoPageScannedPdfOcrsBothPagesAndEmitsPerpageProgress() throws Exception {
+        java.util.List<String> progress = new java.util.ArrayList<>();
+        byte[] scannedPdf = scannedPdfWithTextPages(
+                "First page with Java and cloud backend skills.",
+                "Second page with education and degree in engineering."
+        );
+        String text = extractor.extractText(scannedPdf, progress::add);
+
+        assertTrue(text.contains("Java") || text.contains("skills"));
+        assertTrue(progress.contains("ocr"));
+        assertTrue(progress.contains("ocr-page-1"));
+        assertTrue(progress.contains("ocr-page-1-of-2"));
+        assertTrue(progress.contains("ocr-page-2"));
+        assertTrue(progress.contains("ocr-page-2-of-2"));
+        assertTrue(!progress.contains("ocr-page-3"));
+        assertTrue(progress.contains("ocr-complete"));
+    }
+
+    @Test
+    void threePageScannedPdfOcrsAllThreePages() throws Exception {
+        java.util.List<String> progress = new java.util.ArrayList<>();
+        byte[] scannedPdf = scannedPdfWithTextPages(
+                "Page one summary of professional software development.",
+                "Page two technical work history and microservices experience.",
+                "Page three certifications and university academic honors."
+        );
+        String text = extractor.extractText(scannedPdf, progress::add);
+
+        assertTrue(text.contains("Page") || text.contains("software") || text.contains("development"));
+        assertTrue(progress.contains("ocr-page-1"));
+        assertTrue(progress.contains("ocr-page-1-of-3"));
+        assertTrue(progress.contains("ocr-page-2"));
+        assertTrue(progress.contains("ocr-page-2-of-3"));
+        assertTrue(progress.contains("ocr-page-3"));
+        assertTrue(progress.contains("ocr-page-3-of-3"));
+        assertTrue(!progress.contains("ocr-page-4"));
+        assertTrue(progress.contains("ocr-complete"));
+    }
+
+    @Test
+    void fourOrMorePageScannedPdfStopsOcrAtConfiguredLimit() throws Exception {
+        java.util.List<String> progress = new java.util.ArrayList<>();
+        // Extractor has default maxOcrPages = 3, but the PDF has 4 pages
+        byte[] scannedPdf = scannedPdfWithTextPages(
+                "Page 1 developer profile.",
+                "Page 2 project details.",
+                "Page 3 leadership experience.",
+                "Page 4 additional publications."
+        );
+        String text = extractor.extractText(scannedPdf, progress::add);
+
+        assertTrue(progress.contains("ocr-page-1"));
+        assertTrue(progress.contains("ocr-page-1-of-3"));
+        assertTrue(progress.contains("ocr-page-2"));
+        assertTrue(progress.contains("ocr-page-2-of-3"));
+        assertTrue(progress.contains("ocr-page-3"));
+        assertTrue(progress.contains("ocr-page-3-of-3"));
+        // Page 4 must NOT be processed by OCR
+        assertTrue(!progress.contains("ocr-page-4"));
+        assertTrue(progress.contains("ocr-complete"));
+    }
+
+    @Test
+    void exportVerificationPdfs() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Paths.get("target", "test-pdfs");
+        java.nio.file.Files.createDirectories(dir);
+
+        java.nio.file.Files.write(dir.resolve("text_resume.pdf"),
+                pdfWithText("Alice Smith - Software Engineer with 5 years experience in Java Spring Boot Microservices AWS Docker Kubernetes SQL and Git."));
+
+        java.nio.file.Files.write(dir.resolve("scanned_1p.pdf"),
+                scannedPdfWithTextPages("Alice Smith - Senior Java Developer\nSkills: Java, Spring Boot, PostgreSQL, Docker, AWS.\nExperience: 5+ years building scalable distributed backends."));
+
+        java.nio.file.Files.write(dir.resolve("scanned_2p.pdf"),
+                scannedPdfWithTextPages(
+                        "Alice Smith - Senior Java Developer\nSkills: Java, Spring Boot, PostgreSQL, Docker, AWS.\nExperience: 5+ years building scalable distributed backends.",
+                        "Education: B.S. in Computer Science.\nCertifications: AWS Certified Solutions Architect, Oracle Java SE 11 Developer."
+                ));
+
+        java.nio.file.Files.write(dir.resolve("scanned_3p.pdf"),
+                scannedPdfWithTextPages(
+                        "Alice Smith - Senior Java Developer\nSkills: Java, Spring Boot, PostgreSQL, Docker, AWS.\nExperience: 5+ years building scalable distributed backends.",
+                        "Projects: Built high throughput microservice gateway processing 50k req/s.\nAutomated CI/CD pipelines with GitHub Actions.",
+                        "Education: B.S. in Computer Science.\nCertifications: AWS Certified Solutions Architect, Oracle Java SE 11 Developer."
+                ));
+    }
+
+    @Test
+    void ocrRespectsConfiguredPageLimit() throws Exception {
+        ResumeTextExtractor customLimitExtractor = new ResumeTextExtractor(
+                20, 50_000, 3600, 3600, 8_000_000, "tessdata", 1
+        );
+        assertEquals(1, customLimitExtractor.getMaxOcrPages());
+
+        java.util.List<String> progress = new java.util.ArrayList<>();
+        byte[] scannedPdf = scannedPdfWithTextPages(
+                "Page 1 should be processed.",
+                "Page 2 should be skipped by configured limit."
+        );
+        String text = customLimitExtractor.extractText(scannedPdf, progress::add);
+
+        assertTrue(progress.contains("ocr-page-1"));
+        assertTrue(!progress.contains("ocr-page-2"));
+        assertTrue(progress.contains("ocr-complete"));
+    }
+
+    private byte[] scannedPdfWithTextPages(String... pageTexts) throws IOException {
+        try (PDDocument document = new PDDocument()) {
+            for (String pageText : pageTexts) {
+                int width = (int) (8.5 * 100);
+                int height = (int) (11.0 * 100);
+                java.awt.image.BufferedImage bi = new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                java.awt.Graphics2D g2d = bi.createGraphics();
+                g2d.setColor(java.awt.Color.WHITE);
+                g2d.fillRect(0, 0, width, height);
+                g2d.setColor(java.awt.Color.BLACK);
+                g2d.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
+                g2d.drawString(pageText, 40, 100);
+                g2d.dispose();
+
+                PDPage page = new PDPage(PDRectangle.LETTER);
+                document.addPage(page);
+
+                var pdImage = org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory.createFromImage(document, bi);
+                try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                    content.drawImage(pdImage, 0, 0, PDRectangle.LETTER.getWidth(), PDRectangle.LETTER.getHeight());
+                }
+                bi.flush();
+            }
+            return save(document);
+        }
     }
 
     private byte[] pdfWithPages(int pageCount) throws IOException {

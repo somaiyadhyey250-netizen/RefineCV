@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
@@ -26,24 +27,29 @@ public class ResumeTextExtractor {
 
     private static final Logger logger = LoggerFactory.getLogger(ResumeTextExtractor.class);
 
+    public static final int OCR_DPI = 150;
+
     private final int maxPdfPages;
     private final int maxExtractedTextCharacters;
     private final double maxOcrPageWidthPoints;
     private final double maxOcrPageHeightPoints;
     private final long maxOcrRenderedPixels;
     private final String tessdataPath;
+    private final int maxOcrPages;
 
+    @Autowired
     public ResumeTextExtractor(
             @Value("${refinecv.pdf.max-pages}") int maxPdfPages,
             @Value("${refinecv.pdf.max-extracted-text-characters}") int maxExtractedTextCharacters,
             @Value("${refinecv.pdf.ocr.max-page-width-points:3600}") double maxOcrPageWidthPoints,
             @Value("${refinecv.pdf.ocr.max-page-height-points:3600}") double maxOcrPageHeightPoints,
             @Value("${refinecv.pdf.ocr.max-rendered-pixels:8000000}") long maxOcrRenderedPixels,
-            @Value("${refinecv.ocr.tessdata-path:tessdata}") String tessdataPath
+            @Value("${refinecv.ocr.tessdata-path:tessdata}") String tessdataPath,
+            @Value("${refinecv.pdf.ocr.max-pages:3}") int maxOcrPages
     ) {
         if (maxPdfPages < 1 || maxExtractedTextCharacters < 1
                 || maxOcrPageWidthPoints <= 0 || maxOcrPageHeightPoints <= 0
-                || maxOcrRenderedPixels < 1) {
+                || maxOcrRenderedPixels < 1 || maxOcrPages < 1) {
             throw new IllegalArgumentException("PDF extraction limits must be positive.");
         }
         this.maxPdfPages = maxPdfPages;
@@ -52,6 +58,23 @@ public class ResumeTextExtractor {
         this.maxOcrPageHeightPoints = maxOcrPageHeightPoints;
         this.maxOcrRenderedPixels = maxOcrRenderedPixels;
         this.tessdataPath = tessdataPath;
+        this.maxOcrPages = maxOcrPages;
+    }
+
+    public ResumeTextExtractor(
+            int maxPdfPages,
+            int maxExtractedTextCharacters,
+            double maxOcrPageWidthPoints,
+            double maxOcrPageHeightPoints,
+            long maxOcrRenderedPixels,
+            String tessdataPath
+    ) {
+        this(maxPdfPages, maxExtractedTextCharacters, maxOcrPageWidthPoints, maxOcrPageHeightPoints,
+                maxOcrRenderedPixels, tessdataPath, 3);
+    }
+
+    public int getMaxOcrPages() {
+        return maxOcrPages;
     }
 
     /*
@@ -162,20 +185,25 @@ public class ResumeTextExtractor {
 
             String ocrText =
                     extractUsingOCR(
-                            document
+                            document,
+                            progress
                     );
 
 
             progress.accept("ocr-complete");
 
-            if (!hasMeaningfulText(ocrText)) {
+            String combinedText = (text != null && !text.isBlank())
+                    ? text + "\n" + ocrText
+                    : ocrText;
+
+            if (!hasMeaningfulText(combinedText)) {
                 throw new ResumeValidationException(ResumeValidationException.Reason.NO_READABLE_TEXT);
             }
 
-            ensureTextWithinLimit(ocrText.length());
+            ensureTextWithinLimit(combinedText.length());
 
 
-            return ocrText;
+            return combinedText;
 
         }
     }
@@ -185,7 +213,8 @@ public class ResumeTextExtractor {
      * OCR extraction using Tesseract.
      */
     private String extractUsingOCR(
-            PDDocument document
+            PDDocument document,
+            Consumer<String> progress
     ) {
 
 
@@ -201,32 +230,40 @@ public class ResumeTextExtractor {
         StringBuilder extractedText =
                 new StringBuilder();
 
+        int totalPages = document.getNumberOfPages();
+        int pagesToProcess = Math.min(totalPages, maxOcrPages);
+
 
         try {
 
 
             /*
-             * Process every page of the PDF.
+             * Process pages up to the configured OCR page limit.
              */
 
             for (
                 int page = 0;
-                page < document.getNumberOfPages();
+                page < pagesToProcess;
                 page++
             ) {
 
+                int pageNum = page + 1;
+                if (progress != null) {
+                    progress.accept("ocr-page-" + pageNum);
+                    progress.accept("ocr-page-" + pageNum + "-of-" + pagesToProcess);
+                }
 
                 /*
                  * Render the PDF page as an image.
                  *
-                 * 200 DPI gives a good balance
+                 * 150 DPI gives an optimal balance
                  * between OCR quality and speed.
                  */
 
                 var image =
                         renderer.renderImageWithDPI(
                                 page,
-                                200
+                                OCR_DPI
                         );
 
 
@@ -314,7 +351,7 @@ public class ResumeTextExtractor {
         }
     }
 
-    /** Reject page geometry that could allocate an excessive image at the OCR renderer's 200 DPI. */
+    /** Reject page geometry that could allocate an excessive image at the OCR renderer's 150 DPI. */
     private void validateOcrPageGeometry(PDDocument document) {
         for (int pageIndex = 0; pageIndex < document.getNumberOfPages(); pageIndex++) {
             PDPage page = document.getPage(pageIndex);
@@ -333,8 +370,8 @@ public class ResumeTextExtractor {
             throw new ResumeValidationException(ResumeValidationException.Reason.PAGE_DIMENSIONS_TOO_LARGE);
         }
 
-        long widthPixels = (long) Math.ceil(widthPoints * 200.0 / 72.0);
-        long heightPixels = (long) Math.ceil(heightPoints * 200.0 / 72.0);
+        long widthPixels = (long) Math.ceil(widthPoints * (double) OCR_DPI / 72.0);
+        long heightPixels = (long) Math.ceil(heightPoints * (double) OCR_DPI / 72.0);
         if (widthPixels > Integer.MAX_VALUE || heightPixels > Integer.MAX_VALUE
                 || widthPixels * heightPixels > maxOcrRenderedPixels) {
             throw new ResumeValidationException(ResumeValidationException.Reason.PAGE_DIMENSIONS_TOO_LARGE);

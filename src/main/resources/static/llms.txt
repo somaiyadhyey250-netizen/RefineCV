@@ -1,0 +1,38 @@
+# RefineCV
+
+> RefineCV is an AI-powered resume analyzer and ATS resume checker providing evidence-grounded resume evaluations, role-specific job matching, side-by-side resume comparisons, and interview question preparation.
+
+RefineCV is a web-based resume intelligence platform. Candidates can upload a PDF resume without creating an account and receive structured diagnostic feedback, ATS compatibility insights, actionable bullet point makeovers, head-to-head resume comparisons, and grounded interview preparation to defend their experience.
+
+## Public Tools & Pages
+
+- [RefineCV Home](https://refinecv-vl93.onrender.com/): Platform overview, feature breakdown, and access to RefineCV tools.
+- [Analyze Resume](https://refinecv-vl93.onrender.com/analyze): Resume diagnostic evaluation, ATS readability assessment, and targeted job description matching.
+- [Compare Resumes](https://refinecv-vl93.onrender.com/compare): Side-by-side comparison of two PDF resumes with category scoring and winner verdict.
+- [Interview Prep from CV](https://refinecv-vl93.onrender.com/interview-prep): Interview questions grounded in claims written in the resume, with risk levels and practice answer evaluation.
+
+## Key Capabilities & Workflows
+
+- Resume Analysis: Evaluates overall resume strength, structure, ATS readability, strengths, weaknesses, and actionable improvements.
+- General Diagnostic: Provides a holistic assessment of resume quality and identifies concrete improvement areas.
+- Specific Job Matching: Compares a resume against a user-provided job description to identify role alignment and keyword gaps.
+- Grounded Improvements: Suggests concrete bullet point improvements based on stated candidate experience without intentionally inventing candidate facts.
+- Resume Comparison: Compares two resumes across Impact, Skills, Relevance, and Structure.
+- Interview Preparation: Generates interview questions mapped to claims in the resume and supports practice answer evaluation.
+- PDF Text Extraction and OCR: Extracts resume content from PDFs and can use OCR for scanned resume pages.
+- Real-Time Processing: Provides processing progress through the application's interface.
+
+## Technical & Privacy Constraints
+
+- Supported format: PDF only.
+- Maximum PDF size: 5MB.
+- Maximum PDF pages: 20.
+- OCR processing is limited to 3 scanned pages per document.
+- No account, password, or email registration is required.
+- Analysis sessions are stored transiently in memory and expire after 30 minutes.
+- Resumes are not permanently hosted or indexed by RefineCV.
+- User-specific result and history pages are private/ephemeral and should not be treated as public content.
+
+## Authorship & Attribution
+
+- Built by: [Dhyey Somaiya](https://somaiyadhyey250-netizen.github.io/WebTechnology_P5/)
